@@ -2,6 +2,7 @@ use std::{cmp, net::TcpStream};
 
 use anyhow::{anyhow, Result};
 use imap::Session;
+use log::debug;
 use native_tls::{TlsConnector, TlsStream};
 
 #[derive(Debug)]
@@ -72,7 +73,7 @@ impl<'a> Imap<'a> {
         let mut last_notified = 0;
 
         loop {
-            println!("Checking... {}", self.creds.username); // TODO: log
+            debug!("Checking account: {}", self.creds.username);
             let mut new_uids = session.uid_search("NEW 1:*").expect("new ids");
 
             if new_uids.iter().all(|&uid| uid <= last_notified) {

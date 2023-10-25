@@ -28,6 +28,8 @@ imap = { version = "2.4.1"}
 native-tls = "0.2.11"
 thiserror = "1.0.50"
 dirs = "5.0.1"
+log = "0.4.20"
+simple_logger = "4.2.0"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

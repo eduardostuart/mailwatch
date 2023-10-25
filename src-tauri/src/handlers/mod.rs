@@ -1,5 +1,7 @@
 use std::future::Future;
 
+use log::error;
+
 use crate::error::Error;
 
 pub mod account;
@@ -12,7 +14,7 @@ where
     match action.await {
         Ok(result) => Ok(result),
         Err(e) => {
-            println!("Command error: {:?}", e); // TODO: log
+            error!("Command error: {:?}", e);
             Err(Error::CustomError {
                 message: e.to_string(),
             })

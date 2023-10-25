@@ -1,3 +1,4 @@
+use log::{debug, error};
 use sqlx::{Pool, Sqlite};
 
 use crate::{
@@ -9,6 +10,7 @@ use crate::{
 // Initialize mail watcher
 // Spawn a new async task for each account
 pub async fn init(pool: &Pool<Sqlite>) -> anyhow::Result<()> {
+    debug!("Initializing watcher");
     let accounts = db::account::list_accounts(pool).await?;
     for acc in accounts {
         tokio::spawn(async move { connect(acc.clone()) });
@@ -21,7 +23,7 @@ fn connect(acc: Account) {
     let mut imap = Imap::new(
         Credentials {
             server: (acc.server, acc.port),
-            username: acc.username,
+            username: acc.username.clone(),
             password: acc.password,
         },
         None,
@@ -33,7 +35,8 @@ fn connect(acc: Account) {
                 .expect("could not check for new messages");
         }
         Err(e) => {
-            eprintln!("error while connecting: {:?}", e);
+            let username = &acc.username;
+            error!("error while connecting: {} - {:?}", username, e);
         }
     };
 }

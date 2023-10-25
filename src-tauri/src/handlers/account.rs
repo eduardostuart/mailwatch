@@ -15,7 +15,6 @@ pub async fn cmd_create_account(
     attrs: CreateAccountAttrs,
     state: State<'_, AppState>,
 ) -> Result<i64, Error> {
-    println!("cmd_create_account");
     execute_async_command(create_account(attrs, &state.pool)).await
 }
 

@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use log::info;
 use sqlx::SqlitePool;
 use tauri::{
     App, AppHandle, CustomMenuItem, GlobalWindowEvent, Manager, PhysicalPosition, PhysicalSize,
@@ -11,6 +12,7 @@ pub mod db;
 pub mod error;
 pub mod handlers;
 pub mod imap;
+pub mod keychain;
 pub mod models;
 pub mod watcher;
 
@@ -22,6 +24,9 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    simple_logger::init_with_level(log::Level::Info)?;
+
+    info!("Initializing app");
     // Directories
     let app_dir = format!("{}/mailwatch", &dirs::home_dir().unwrap().display());
     let db_dir = format!("{}/.db", app_dir);
