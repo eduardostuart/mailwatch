@@ -12,6 +12,7 @@ pub struct CreateAccountAttrs {
     pub color: String,
     pub active: bool,
     pub username: String,
+    pub mailbox: String,
 }
 
 /// Creates a new account in the database and returns its unique identifier.
@@ -22,9 +23,9 @@ pub struct CreateAccountAttrs {
 pub async fn create_account(attrs: CreateAccountAttrs, pool: &Pool<Sqlite>) -> Result<Account> {
     let query = r#"
         INSERT INTO accounts 
-            (name, server, port, color, active, username) 
+            (name, server, port, color, active, username, mailbox) 
         VALUES 
-            ($1,$2,$3,$4,$5,$6)
+            ($1,$2,$3,$4,$5,$6,$7)
     "#;
 
     let id = sqlx::query(query)
@@ -34,6 +35,7 @@ pub async fn create_account(attrs: CreateAccountAttrs, pool: &Pool<Sqlite>) -> R
         .bind(attrs.color)
         .bind(attrs.active)
         .bind(attrs.username)
+        .bind(attrs.mailbox)
         .execute(pool)
         .await?
         .last_insert_rowid();
@@ -60,7 +62,7 @@ pub async fn delete_account(id: i64, pool: &Pool<Sqlite>) -> Result<()> {
 pub async fn list_accounts(pool: &Pool<Sqlite>) -> Result<Vec<Account>> {
     // TODO: remove password
     let query = r#"SELECT 
-            id, name, color, server, port, active, username
+            id, name, color, server, port, active, username, mailbox
         FROM accounts 
         order by id 
         desc"#;
@@ -75,7 +77,7 @@ pub async fn list_accounts(pool: &Pool<Sqlite>) -> Result<Vec<Account>> {
 /// * `pool` - A reference to the SQLite connection pool.
 pub async fn find_account_by_id(id: i64, pool: &Pool<Sqlite>) -> Result<Account> {
     let query = r#"SELECT 
-        id, name, color, server, port, active, username 
+        id, name, color, server, port, active, username, mailbox
     FROM 
      accounts where id = ?
     "#;

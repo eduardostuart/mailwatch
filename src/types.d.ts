@@ -8,7 +8,8 @@ type Account = {
   color: string;
   active: boolean;
   username: string;
-  password: string;
+  mailbox: string;
+  password?: string;
 };
 
 type ConnectionCreds = {
@@ -16,4 +17,5 @@ type ConnectionCreds = {
   port: number;
   username: string;
   password: string;
+  mailbox: string;
 };

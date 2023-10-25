@@ -50,7 +50,7 @@ type Form = {
   color: string;
   username: string;
   password: string;
-  inbox: string;
+  mailbox: string;
 };
 
 const form = reactive<Form>({
@@ -58,7 +58,7 @@ const form = reactive<Form>({
   server: "",
   port: 993,
   username: "",
-  inbox: "inbox",
+  mailbox: "mailbox",
   password: "",
   color: Color.BLUE.toString(),
 });
@@ -81,7 +81,7 @@ const canSubmit = computed(() => {
     String(form.port) === "" ||
     form.username.trim() === "" ||
     form.password.trim() === "" ||
-    form.inbox.trim() === ""
+    form.mailbox.trim() === ""
   ) {
     return false;
   }
@@ -94,7 +94,7 @@ const canTestConnection = computed(() => {
     String(form.port) === "" ||
     form.username.trim() === "" ||
     form.password.trim() === "" ||
-    form.inbox.trim() === ""
+    form.mailbox.trim() === ""
   ) {
     return false;
   }
@@ -117,6 +117,7 @@ const onFormSubmit = async () => {
       active: true,
       username: form.username,
       password: form.password,
+      mailbox: form.mailbox,
     });
     close();
   } catch (e) {
@@ -129,6 +130,7 @@ let unListenConnectionTestResult: UnlistenFn | undefined;
 onBeforeMount(async () => {
   unListenConnectionTestResult = await Account.onTestConnectionResponse(
     (payload: string) => {
+      console.log(payload);
       testing.value = false;
       window.alert(payload);
     }
@@ -150,8 +152,10 @@ const onTestConnectionClick = async () => {
       port: form.port,
       username: form.username,
       password: form.password,
+      mailbox: form.mailbox,
     });
   } catch (err) {
+    console.error(err);
     testing.value = false;
     window.alert(`Error: ${(err as Error).message}`);
   }
@@ -238,8 +242,8 @@ const onTestConnectionClick = async () => {
           </div>
         </div>
         <div class="w-full">
-          <FormBlock :label="{ value: 'Inbox', for: 'inbox' }">
-            <CustomInput v-model="form.inbox" name="inbox" id="inbox" />
+          <FormBlock :label="{ value: 'mailbox', for: 'mailbox' }">
+            <CustomInput v-model="form.mailbox" name="mailbox" id="mailbox" />
           </FormBlock>
         </div>
       </form>

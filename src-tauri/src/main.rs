@@ -1,6 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::sync::mpsc::channel;
+
 use log::info;
 use sqlx::SqlitePool;
 use tauri::{
@@ -36,8 +38,9 @@ async fn main() -> anyhow::Result<()> {
     let pool = db::connect(&db_path).await;
     db::run_migrations(&pool).await?;
 
+    let (tx, rx) = channel::<(models::Account, String)>();
     // Initialize watcher
-    watcher::init(&pool)
+    watcher::init(&pool, tx)
         .await
         .expect("Error while initializing watcher");
 
@@ -60,6 +63,17 @@ async fn main() -> anyhow::Result<()> {
         .build(tauri::generate_context!())
         .expect("Error while running application")
         .run(|_, _| {});
+
+    for r in rx.recv() {
+        let x = if let (acc, msg) = r {
+            acc
+        } else {
+            break;
+        };
+
+        info!("account: {:?} has new messages.", x);
+    }
+
     Ok(())
 }
 

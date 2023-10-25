@@ -1,4 +1,5 @@
-use crate::imap::{Credentials, Imap};
+use crate::imap::Imap;
+use log::{error, info};
 use serde::Deserialize;
 use tauri::{command, Window};
 
@@ -12,6 +13,8 @@ pub struct TestConnectionAttrs {
     pub username: String,
     /// Imap password
     pub password: String,
+    /// Mailbox name
+    pub mailbox: String,
 }
 
 /// A command to verify IMAP server credentials.
@@ -22,19 +25,25 @@ pub struct TestConnectionAttrs {
 /// when the connection test ends.
 #[command]
 pub fn cmd_test_connection(attrs: TestConnectionAttrs, window: Window) {
-    let creds = Credentials {
-        server: (attrs.server, attrs.port),
-        username: attrs.username,
-        password: attrs.password,
-    };
-
     tauri::async_runtime::spawn(async move {
         window
             .emit(
                 "connection_test_result",
-                match Imap::new(creds, None).test_connection() {
-                    Ok(msg) => msg,
-                    Err(e) => e.to_string(),
+                match Imap::new(None).test_connection(
+                    &attrs.server,
+                    attrs.port,
+                    &attrs.username,
+                    &attrs.password,
+                    &attrs.mailbox,
+                ) {
+                    Ok(msg) => {
+                        info!("Connection test: {}", msg);
+                        msg
+                    }
+                    Err(e) => {
+                        error!("Connection test failed: {}", e);
+                        e.to_string()
+                    }
                 },
             )
             .unwrap();

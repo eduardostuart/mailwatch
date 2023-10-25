@@ -23,6 +23,7 @@ pub struct NewAccountAttrs {
     pub active: bool,
     pub username: String,
     pub password: String,
+    pub mailbox: String,
 }
 
 /// Command to create new acounts
@@ -38,6 +39,7 @@ pub async fn cmd_create_account(
         color: attrs.color,
         active: true,
         username: attrs.username,
+        mailbox: attrs.mailbox,
     };
 
     let account = execute_async_command(create_account(new_account_attrs, &state.pool)).await?;

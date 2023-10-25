@@ -10,4 +10,5 @@ pub struct Account {
     pub color: String,
     pub active: bool,
     pub username: String,
+    pub mailbox: String,
 }
