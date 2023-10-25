@@ -9,9 +9,9 @@ body,
 }
 
 body {
-  @apply antialiased text-white bg-transparent;
+  @apply antialiased text-gray-800 dark:text-white bg-transparent font-mono;
 }
 
 #app {
-  @apply rounded-lg bg-black;
+  @apply rounded-lg bg-gray-50 dark:bg-black;
 }

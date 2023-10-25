@@ -2,7 +2,7 @@
 import { computed } from "vue";
 
 type Props = {
-  type: string;
+  type?: string;
   value?: string;
   modelValue?: string | number;
 };
@@ -29,6 +29,6 @@ const value = computed({
     :value="modelValue"
     :type="type"
     v-model="value"
-    class="block w-full px-3 py-2 text-white bg-gray-900 border border-gray-600/60 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 disabled:shadow-none invalid:border-red-500 invalid:text-red-600 focus:invalid:border-red-500 focus:invalid:ring-red-500"
+    class="block w-full px-3 py-2 text-gray-800 dark:text-white bg-gray-100 dark:bg-gray-900 border border-gray-300/90 dark:border-gray-600/60 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 disabled:shadow-none invalid:border-red-500 invalid:text-red-600 focus:invalid:border-red-500 focus:invalid:ring-red-500"
   />
 </template>

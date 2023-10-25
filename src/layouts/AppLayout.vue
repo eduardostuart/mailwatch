@@ -53,7 +53,7 @@ const onDrag = async () => {
 
     <div
       v-if="slots.footer"
-      class="w-full h-[46px] py-2 text-sm bg-black border-t border-gray-600/30"
+      class="w-full h-[46px] py-2 text-sm border-gray-200 dark:bg-black border-t dark:border-gray-600/30"
     >
       <div class="px-4 w-full h-full flex items-center">
         <slot name="footer" />

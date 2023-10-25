@@ -50,6 +50,7 @@ type Form = {
   color: string;
   username: string;
   password: string;
+  inbox: string;
 };
 
 const form = reactive<Form>({
@@ -57,6 +58,7 @@ const form = reactive<Form>({
   server: "",
   port: 993,
   username: "",
+  inbox: "inbox",
   password: "",
   color: Color.BLUE.toString(),
 });
@@ -73,32 +75,55 @@ onMounted(async () => {
   }
 });
 
-// TODO: improve this
 const canSubmit = computed(() => {
   if (
-    !form.name.trim() ||
-    !form.server.trim() ||
-    !form.port ||
-    !form.username.trim() ||
-    !form.password.trim()
+    form.name.trim() === "" ||
+    form.server.trim() === "" ||
+    String(form.port) === "" ||
+    form.username.trim() === "" ||
+    form.password.trim() === "" ||
+    form.inbox.trim() === ""
   ) {
     return false;
   }
   return true;
 });
 
-// TODO: error handling
+const canTestConnection = computed(() => {
+  if (
+    form.server.trim() === "" ||
+    String(form.port) === "" ||
+    form.username.trim() === "" ||
+    form.password.trim() === "" ||
+    form.inbox.trim() === ""
+  ) {
+    return false;
+  }
+  return true;
+});
+
+const saving = ref<boolean>(false);
 const onFormSubmit = async () => {
-  await Account.create({
-    name: form.name,
-    server: form.server,
-    port: Number(form.port),
-    color: form.color,
-    active: true,
-    username: form.username,
-    password: form.password,
-  });
-  close();
+  if (!canSubmit.value) {
+    return;
+  }
+
+  saving.value = true;
+  try {
+    await Account.create({
+      name: form.name,
+      server: form.server,
+      port: Number(form.port),
+      color: form.color,
+      active: true,
+      username: form.username,
+      password: form.password,
+    });
+    close();
+  } catch (e) {
+    window.alert((e as Error).message);
+  }
+  saving.value = false;
 };
 
 let unListenConnectionTestResult: UnlistenFn | undefined;
@@ -115,6 +140,9 @@ onBeforeUnmount(async () => {
 });
 
 const onTestConnectionClick = async () => {
+  if (!canTestConnection.value) {
+    return;
+  }
   testing.value = true;
   try {
     await Account.testConnection({
@@ -124,9 +152,9 @@ const onTestConnectionClick = async () => {
       password: form.password,
     });
   } catch (err) {
-    testing.value = false;
     window.alert(`Error: ${(err as Error).message}`);
   }
+  testing.value = false;
 };
 </script>
 <template>
@@ -164,9 +192,8 @@ const onTestConnectionClick = async () => {
             </FormBlock>
           </div>
         </div>
-
         <div class="w-full flex flex-row">
-          <div class="w-[90%] mr-6">
+          <div class="w-[100%] mr-6">
             <FormBlock :label="{ value: 'Server', for: 'server' }">
               <CustomInput
                 v-model="form.server"
@@ -176,7 +203,7 @@ const onTestConnectionClick = async () => {
               />
             </FormBlock>
           </div>
-          <div class="w-[100px]">
+          <div class="w-[100px] ml-auto">
             <FormBlock :label="{ value: 'Port', for: 'port' }">
               <CustomInput
                 v-model="form.port"
@@ -200,7 +227,7 @@ const onTestConnectionClick = async () => {
               />
             </FormBlock>
           </div>
-          <div class="w-[50%]">
+          <div class="w-[50%] ml-auto">
             <FormBlock :label="{ value: 'Password', for: 'password' }">
               <CustomInput
                 v-model="form.password"
@@ -210,11 +237,17 @@ const onTestConnectionClick = async () => {
             </FormBlock>
           </div>
         </div>
+        <div class="w-full">
+          <FormBlock :label="{ value: 'Inbox', for: 'inbox' }">
+            <CustomInput v-model="form.inbox" name="inbox" id="inbox" />
+          </FormBlock>
+        </div>
       </form>
     </template>
     <template #footer>
       <CustomButton
         :disabled="!canSubmit"
+        :loading="saving"
         @click.prevent="onFormSubmit"
         type="button"
         >Save</CustomButton
@@ -222,7 +255,8 @@ const onTestConnectionClick = async () => {
       <CustomButton
         @click.prevent="onTestConnectionClick"
         class="ml-auto"
-        :disabled="testing"
+        :loading="testing"
+        :disabled="testing || !canTestConnection"
         type="button"
       >
         test connection</CustomButton
