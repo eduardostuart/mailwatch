@@ -52,7 +52,7 @@ const onCloseClick = () => appWindow.hide();
       </a>
     </template>
     <template #body>
-      <div class="w-full px-4 overflow-y-auto h-full">
+      <div class="w-full px-4 overflow-y-auto h-full" v-if="accounts.length">
         <AccountItem
           @click.prevent="onAccountItemClick(account)"
           class="cursor-pointer mb-2"
@@ -60,6 +60,15 @@ const onCloseClick = () => appWindow.hide();
           :key="account.id"
           :account="account"
         />
+      </div>
+      <div v-else class="w-full h-full flex items-center justify-center">
+        Get started by adding your
+        <a
+          href="#"
+          @click.prevent="onAddAccountClick"
+          class="ml-1 underline hover:bg-pink-600 hover:text-white dark:hover:bg-pink-600 dark:text-white dark:hover:text-white rounded-sm transition-colors ease-in-out"
+          >first account</a
+        >.
       </div>
     </template>
     <template #footer>
