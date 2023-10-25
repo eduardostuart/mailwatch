@@ -25,8 +25,8 @@ pub struct AppState {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     simple_logger::init_with_level(log::Level::Info)?;
-
     info!("Initializing app");
+
     // Directories
     let app_dir = format!("{}/mailwatch", &dirs::home_dir().unwrap().display());
     let db_dir = format!("{}/.db", app_dir);

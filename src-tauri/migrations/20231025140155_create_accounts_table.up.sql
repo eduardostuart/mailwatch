@@ -5,6 +5,5 @@ CREATE TABLE IF NOT EXISTS accounts (
   port INTEGER NOT NULL,
   color TEXT NOT NULL DEFAULT 'blue',
   active BOOLEAN NOT NULL DEFAULT 1,
-  username TEXT NOT NULL,
-  password TEXT NOT NULL 
+  username TEXT NOT NULL
 );

@@ -10,7 +10,4 @@ pub struct Account {
     pub color: String,
     pub active: bool,
     pub username: String,
-    // TODO: temporary solution, this won't be saved in the db.
-    // Password/username will be stored in a keychain
-    pub password: String,
 }

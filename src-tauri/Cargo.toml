@@ -30,6 +30,7 @@ thiserror = "1.0.50"
 dirs = "5.0.1"
 log = "0.4.20"
 simple_logger = "4.2.0"
+keyring = "2.0.5"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

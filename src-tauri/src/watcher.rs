@@ -4,6 +4,7 @@ use sqlx::{Pool, Sqlite};
 use crate::{
     db,
     imap::{Credentials, Imap},
+    keychain::{Keychain, KeychainEntryKey},
     models::Account,
 };
 
@@ -18,13 +19,16 @@ pub async fn init(pool: &Pool<Sqlite>) -> anyhow::Result<()> {
     Ok(())
 }
 
-// TODO: channel, get password from keychain or somewhere else
 fn connect(acc: Account) {
+    let password = Keychain::new()
+        .get_password(KeychainEntryKey::new(acc.id, &acc.username))
+        .expect("Password not found");
+
     let mut imap = Imap::new(
         Credentials {
             server: (acc.server, acc.port),
             username: acc.username.clone(),
-            password: acc.password,
+            password,
         },
         None,
     );
