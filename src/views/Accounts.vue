@@ -32,7 +32,7 @@ const onCloseClick = () => appWindow.hide();
       <a
         href="#"
         title="Settings"
-        class="text-white ml-auto"
+        class="text-gray-800 dark:text-white ml-auto"
         @click.prevent="router.push({ name: 'settings' })"
       >
         <svg

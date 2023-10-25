@@ -17,7 +17,7 @@ defineProps<Props>();
       class="mb-2 text-xs font-semibold uppercase flex items-center"
       :class="{
         'text-red-600 :': error,
-        'text-white': !error,
+        'text-gray-800 dark:text-white': !error,
       }"
     >
       {{ label.value }}

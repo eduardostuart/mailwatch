@@ -66,7 +66,6 @@ const form = reactive<Form>({
 onMounted(async () => {
   if (!isCreatingAccount.value && id.value) {
     const account = await Account.findById(id.value);
-    console.log({ account });
     form.name = account?.name || "";
     form.server = account?.server || "";
     form.color = account?.color || Color.BLUE.toString();
@@ -130,6 +129,7 @@ let unListenConnectionTestResult: UnlistenFn | undefined;
 onBeforeMount(async () => {
   unListenConnectionTestResult = await Account.onTestConnectionResponse(
     (payload: string) => {
+      testing.value = false;
       window.alert(payload);
     }
   );
@@ -152,9 +152,9 @@ const onTestConnectionClick = async () => {
       password: form.password,
     });
   } catch (err) {
+    testing.value = false;
     window.alert(`Error: ${(err as Error).message}`);
   }
-  testing.value = false;
 };
 </script>
 <template>
