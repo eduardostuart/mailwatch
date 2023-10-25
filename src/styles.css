@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#app {
+  @apply w-full h-full overflow-hidden;
+}
+
+body {
+  @apply antialiased text-white bg-transparent;
+}
+
+#app {
+  @apply rounded-lg bg-black;
+}
