@@ -1,0 +1,84 @@
+{
+  "build": {
+    "beforeDevCommand": "pnpm run dev",
+    "beforeBuildCommand": "pnpm run build",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist",
+    "withGlobalTauri": false
+  },
+  "package": {
+    "productName": "MailWatch",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false,
+        "open": true
+      },
+      "notification": {
+        "all": true
+      },
+      "dialog": {
+        "all": true
+      },
+      "window": {
+        "all": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "category": "Utility",
+      "copyright": "",
+      "deb": {
+        "depends": []
+      },
+      "targets": "all",
+      "identifier": "dev.mailwatch",
+      "longDescription": "A system tray application that provides real-time notifications for unseen emails across multiple email accounts.",
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ],
+      "resources": [],
+      "shortDescription": "A system tray application that provides real-time notifications for unseen emails",
+      "windows": {
+        "certificateThumbprint": null,
+        "digestAlgorithm": "sha256",
+        "timestampUrl": ""
+      }
+    },
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "resizable": true,
+        "title": "MailWatch",
+        "width": 420,
+        "maxWidth": 600,
+        "alwaysOnTop": true,
+        "maxHeight": 800,
+        "minWidth": 420,
+        "minHeight": 420,
+        "height": 420,
+        "visible": false,
+        "skipTaskbar": true,
+        "transparent": true,
+        "titleBarStyle": "Overlay",
+        "decorations": false
+      }
+    ],
+    "macOSPrivateApi": true,
+    "systemTray": {
+      "iconPath": "icons/tray.png",
+      "iconAsTemplate": true,
+      "menuOnLeftClick": false
+    }
+  }
+}
