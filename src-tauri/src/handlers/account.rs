@@ -77,7 +77,9 @@ pub async fn cmd_delete_account(id: i64, state: State<'_, AppState>) -> Result<(
 
     let key = Keychain::new().get_entry(&KeychainEntryKey::new(acc.id, &acc.username));
     if key.is_ok() {
-        let _ = key.unwrap().delete_password().unwrap();
+        if let Ok(_) = key.unwrap().delete_password() {
+            info!("Key deleted from keychain");
+        }
     }
 
     execute_async_command(delete_account(id, &state.pool)).await?;

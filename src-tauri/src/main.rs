@@ -3,7 +3,7 @@
 
 use std::{sync::mpsc::channel, thread};
 
-use log::{error, info};
+use log::info;
 use sqlx::SqlitePool;
 use tauri::{
     App, AppHandle, CustomMenuItem, GlobalWindowEvent, Manager, PhysicalPosition, PhysicalSize,
@@ -31,7 +31,10 @@ async fn main() -> anyhow::Result<()> {
     info!("Initializing app");
 
     // Directories
-    let app_dir = format!("{}/mailwatch", &dirs::home_dir().unwrap().display());
+    let app_dir = format!(
+        "{}/mailwatch",
+        tauri::api::path::home_dir().unwrap().display()
+    );
     let db_dir = format!("{}/.db", app_dir);
 
     // Initialize db
