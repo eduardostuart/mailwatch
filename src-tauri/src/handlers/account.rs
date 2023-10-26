@@ -70,3 +70,17 @@ pub async fn cmd_list_accounts(state: State<'_, AppState>) -> Result<Vec<Account
 pub async fn cmd_find_account(id: i64, state: State<'_, AppState>) -> Result<Account, Error> {
     execute_async_command(find_account_by_id(id, &state.pool)).await
 }
+
+#[command]
+pub async fn cmd_delete_account(id: i64, state: State<'_, AppState>) -> Result<(), Error> {
+    let acc = execute_async_command(find_account_by_id(id, &state.pool)).await?;
+
+    let key = Keychain::new().get_entry(&KeychainEntryKey::new(acc.id, &acc.username));
+    if key.is_ok() {
+        let _ = key.unwrap().delete_password().unwrap();
+    }
+
+    execute_async_command(delete_account(id, &state.pool)).await?;
+
+    Ok(())
+}

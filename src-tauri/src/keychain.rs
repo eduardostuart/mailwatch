@@ -26,12 +26,16 @@ impl Keychain {
         Self {}
     }
 
+    pub fn get_entry(&self, identification: &KeychainEntryKey) -> anyhow::Result<Entry> {
+        Ok(Entry::new(SERVICE, &identification.to_string())?)
+    }
+
     pub fn new_entry(
         &self,
         identification: &KeychainEntryKey,
         password: &str,
     ) -> anyhow::Result<Entry> {
-        let entry = Entry::new(SERVICE, &identification.to_string())?;
+        let entry = self.get_entry(identification)?;
         entry.set_password(password)?;
         Ok(entry)
     }

@@ -19,6 +19,9 @@ export function api() {
       testConnection(attrs: ConnectionCreds): Promise<string> {
         return invoke<string>("cmd_test_connection", { attrs });
       },
+      delete(id: number): Promise<void> {
+        return invoke<void>("cmd_delete_account", { id });
+      },
       // Find an account by id
       findById(id: number): Promise<Account | undefined> {
         return invoke<Account | undefined>("cmd_find_account", { id });

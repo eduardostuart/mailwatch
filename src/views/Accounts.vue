@@ -61,14 +61,24 @@ const onCloseClick = () => appWindow.hide();
           :account="account"
         />
       </div>
-      <div v-else class="w-full h-full flex items-center justify-center">
-        Get started by adding your
-        <a
-          href="#"
-          @click.prevent="onAddAccountClick"
-          class="ml-1 underline hover:bg-pink-600 hover:text-white dark:hover:bg-pink-600 dark:text-white dark:hover:text-white rounded-sm transition-colors ease-in-out"
-          >first account</a
-        >.
+      <div
+        v-else
+        class="w-full h-full px-4 flex flex-col items-center justify-center"
+      >
+        <img
+          src="/illustration.svg"
+          alt="Illustration"
+          class="w-[280px] mb-10"
+        />
+        <p class="text-sm">
+          Get started by adding your
+          <a
+            href="#"
+            @click.prevent="onAddAccountClick"
+            class="ml-1 underline hover:bg-pink-600 hover:text-white dark:hover:bg-pink-600 dark:text-white dark:hover:text-white rounded-sm transition-colors ease-in-out"
+            >first account</a
+          >.
+        </p>
       </div>
     </template>
     <template #footer>

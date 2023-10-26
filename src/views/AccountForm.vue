@@ -160,6 +160,21 @@ const onTestConnectionClick = async () => {
     window.alert(`Error: ${(err as Error).message}`);
   }
 };
+
+const deleting = ref<boolean>(false);
+const onDeleteClick = async () => {
+  // TODO: add confirmation
+  if (!id.value) {
+    return;
+  }
+  try {
+    await Account.delete(id.value);
+    close();
+  } catch (err) {
+    console.error(err);
+  }
+  deleting.value = false;
+};
 </script>
 <template>
   <AppLayout
@@ -256,6 +271,14 @@ const onTestConnectionClick = async () => {
         @click.prevent="onFormSubmit"
         type="button"
         >Save</CustomButton
+      >
+      <CustomButton
+        v-if="id"
+        class="ml-2"
+        :loading="deleting"
+        @click.prevent="onDeleteClick"
+        type="button"
+        >Delete</CustomButton
       >
       <CustomButton
         @click.prevent="onTestConnectionClick"
