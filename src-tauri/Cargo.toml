@@ -31,6 +31,7 @@ dirs = "5.0.1"
 log = "0.4.20"
 simple_logger = "4.2.0"
 keyring = "2.0.5"
+notify-rust = "4.9.0"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

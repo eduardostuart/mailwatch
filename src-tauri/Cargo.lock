@@ -2158,6 +2158,7 @@ dependencies = [
  "keyring",
  "log",
  "native-tls",
+ "notify-rust",
  "ring",
  "serde",
  "serde_json",

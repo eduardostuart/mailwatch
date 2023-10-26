@@ -1,9 +1,9 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::sync::mpsc::channel;
+use std::{sync::mpsc::channel, thread};
 
-use log::info;
+use log::{error, info};
 use sqlx::SqlitePool;
 use tauri::{
     App, AppHandle, CustomMenuItem, GlobalWindowEvent, Manager, PhysicalPosition, PhysicalSize,
@@ -27,6 +27,7 @@ pub struct AppState {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     simple_logger::init_with_level(log::Level::Info)?;
+
     info!("Initializing app");
 
     // Directories
@@ -43,6 +44,23 @@ async fn main() -> anyhow::Result<()> {
     watcher::init(&pool, tx)
         .await
         .expect("Error while initializing watcher");
+
+    let rxt = thread::spawn(move || {
+        while let Ok((acc, msg)) = rx.recv() {
+            info!("Received:{}", msg);
+            // TODO: this needs to be improved
+            // show total messages?
+            // preview of message(s)? (check settings)
+            match notify_rust::Notification::new()
+                .summary(&acc.name)
+                .body("New email received")
+                .show()
+            {
+                Ok(_) => info!("Notification sent"),
+                Err(e) => error!("Notification error: {}", e),
+            };
+        }
+    });
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -64,15 +82,7 @@ async fn main() -> anyhow::Result<()> {
         .expect("Error while running application")
         .run(|_, _| {});
 
-    for r in rx.recv() {
-        let x = if let (acc, msg) = r {
-            acc
-        } else {
-            break;
-        };
-
-        info!("account: {:?} has new messages.", x);
-    }
+    rxt.join().unwrap();
 
     Ok(())
 }
