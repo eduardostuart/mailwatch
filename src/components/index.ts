@@ -5,3 +5,5 @@ export { default as CustomInput } from "./CustomInput.vue";
 export { default as CustomColorInput } from "./CustomColorInput.vue";
 export { default as FormBlock } from "./FormBlock.vue";
 export { default as FormSelect } from "./FormSelect.vue";
+export { default as PreferencePanel } from "./PreferencePanel.vue";
+export { default as PreferenceBlock } from "./PreferenceBlock.vue";

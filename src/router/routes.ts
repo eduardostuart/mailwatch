@@ -1,24 +1,27 @@
 import { RouteRecordRaw } from "vue-router";
+import AccountsView from "@/views/Accounts.vue";
+import AccountFormView from "@/views/AccountForm.vue";
+import SettingsView from "@/views/Settings.vue";
 
 export const routes: RouteRecordRaw[] = [
   {
     path: "/",
     name: "home",
-    component: () => import("@/views/Accounts.vue"),
+    component: AccountsView,
   },
   {
     path: "/accounts/add",
     name: "add-account",
-    component: () => import("@/views/AccountForm.vue"),
+    component: AccountFormView,
   },
   {
     path: "/accounts/edit/:id",
     name: "edit-account",
-    component: () => import("@/views/AccountForm.vue"),
+    component: AccountFormView,
   },
   {
     path: "/settings",
     name: "settings",
-    component: () => import("@/views/Settings.vue"),
+    component: SettingsView,
   },
 ];
