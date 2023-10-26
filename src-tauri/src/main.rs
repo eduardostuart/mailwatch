@@ -48,17 +48,17 @@ async fn main() -> anyhow::Result<()> {
     let rxt = thread::spawn(move || {
         while let Ok((acc, msg)) = rx.recv() {
             info!("Received:{}", msg);
+
             // TODO: this needs to be improved
             // show total messages?
             // preview of message(s)? (check settings)
-            match notify_rust::Notification::new()
-                .summary(&acc.name)
+
+            let title = acc.name.to_string();
+            tauri::api::notification::Notification::new(acc.name)
                 .body("New email received")
+                .title(title)
                 .show()
-            {
-                Ok(_) => info!("Notification sent"),
-                Err(e) => error!("Notification error: {}", e),
-            };
+                .unwrap();
         }
     });
 
@@ -79,8 +79,7 @@ async fn main() -> anyhow::Result<()> {
         .on_system_tray_event(on_system_tray_event)
         .on_window_event(on_window_event)
         .setup(on_app_setup)
-        .build(tauri::generate_context!())
-        .expect("Error while running application")
+        .build(tauri::generate_context!())?
         .run(|_, _| {});
 
     rxt.join().unwrap();
