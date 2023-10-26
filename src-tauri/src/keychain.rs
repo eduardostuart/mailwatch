@@ -46,3 +46,9 @@ impl Keychain {
         Ok(())
     }
 }
+
+impl Default for Keychain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
