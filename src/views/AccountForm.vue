@@ -18,6 +18,7 @@ import {
   ref,
 } from "vue";
 import { useRouter } from "vue-router";
+import { confirm, message } from "@tauri-apps/api/dialog";
 
 const router = useRouter();
 const { Account } = api();
@@ -121,7 +122,10 @@ const onFormSubmit = async () => {
     });
     close();
   } catch (e) {
-    window.alert((e as Error).message);
+    await message((e as Error).message, {
+      title: "Error",
+      type: "error",
+    });
   }
   saving.value = false;
 };
@@ -129,10 +133,12 @@ const onFormSubmit = async () => {
 let unListenConnectionTestResult: UnlistenFn | undefined;
 onBeforeMount(async () => {
   unListenConnectionTestResult = await Account.onTestConnectionResponse(
-    (payload: string) => {
-      console.log(payload);
+    async (payload: string) => {
       testing.value = false;
-      window.alert(payload);
+      await message(payload, {
+        title: "Test connection",
+        type: "info",
+      });
     }
   );
 });
@@ -157,16 +163,33 @@ const onTestConnectionClick = async () => {
   } catch (err) {
     console.error(err);
     testing.value = false;
-    window.alert(`Error: ${(err as Error).message}`);
+    await message((err as Error).message, {
+      title: "Error",
+      type: "error",
+    });
   }
 };
 
 const deleting = ref<boolean>(false);
 const onDeleteClick = async () => {
-  // TODO: add confirmation
   if (!id.value) {
     return;
   }
+
+  const result = await confirm(
+    "Confirm account deletion. This action is irreversible.",
+    {
+      title: "Confirmation",
+      type: "warning",
+      okLabel: "DELETE",
+      cancelLabel: "Cancel",
+    }
+  );
+
+  if (!result) {
+    return;
+  }
+
   try {
     await Account.delete(id.value);
     close();
