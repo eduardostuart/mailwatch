@@ -141,13 +141,10 @@ fn toggle_window_visibility(
 // This will hide the window and keep it on tray
 // The user can still kill the app using CMD+Q or tray "quit" option
 fn on_window_event(event: GlobalWindowEvent) {
-    match event.event() {
-        tauri::WindowEvent::CloseRequested { api, .. } => {
-            event.window().hide().unwrap();
-            api.prevent_close();
-        }
-        _ => {}
-    };
+    if let tauri::WindowEvent::CloseRequested { api, .. } = event.event() {
+        event.window().hide().unwrap();
+        api.prevent_close();
+    }
 }
 
 fn on_app_setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
