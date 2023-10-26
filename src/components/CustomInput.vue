@@ -1,10 +1,16 @@
 <script setup lang="ts">
+// Custom form input
+// autocomplete/spellcheck/autocapitaliz is disabled by default
 import { computed } from "vue";
 
 type Props = {
   type?: string;
   value?: string;
   modelValue?: string | number;
+  autocomplete?: string;
+  spellcheck?: boolean | "true" | "false";
+  autocorrect?: string;
+  autocapitalize?: string;
 };
 
 const emits = defineEmits(["update:modelValue"]);
@@ -12,6 +18,10 @@ const emits = defineEmits(["update:modelValue"]);
 const props = withDefaults(defineProps<Props>(), {
   type: "text",
   value: "",
+  autocomplete: "off",
+  spellcheck: "false",
+  autocorrect: "off",
+  autocapitalize: "none",
 });
 
 const value = computed({
@@ -26,6 +36,10 @@ const value = computed({
 <template>
   <input
     data-1p-ignore
+    :autocomplete="autocomplete"
+    :spellcheck="spellcheck"
+    :autocorrect="autocorrect"
+    :autocapitalize="autocapitalize"
     :value="modelValue"
     :type="type"
     v-model="value"

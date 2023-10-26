@@ -170,6 +170,7 @@ const onTestConnectionClick = async () => {
     <template #title>{{ title }}</template>
     <template #body>
       <form
+        autocomplete="false"
         @submit.prevent="onFormSubmit"
         class="w-full px-4 overflow-y-auto h-full"
       >
