@@ -143,9 +143,6 @@ fn on_window_event(event: GlobalWindowEvent) {
             event.window().hide().unwrap();
             api.prevent_close();
         }
-        tauri::WindowEvent::Focused(false) => {
-            event.window().hide().unwrap();
-        }
         _ => {}
     };
 }
