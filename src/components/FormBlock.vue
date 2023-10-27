@@ -1,13 +1,20 @@
 <script setup lang="ts">
+import { computed } from "vue";
+
 type Label = {
   value: string;
   for?: string;
 };
 type Props = {
   label?: Label;
-  error?: string;
+  error?: Record<string, string>;
 };
-defineProps<Props>();
+
+const props = defineProps<Props>();
+
+const hasError = computed(() => {
+  return props.error && Object.keys(props.error).length > 0;
+});
 </script>
 <template>
   <div class="w-full py-2 block">
@@ -16,8 +23,8 @@ defineProps<Props>();
       :for="label?.for"
       class="mb-2 text-xs font-semibold uppercase flex items-center"
       :class="{
-        'text-red-600 :': error,
-        'text-gray-800 dark:text-white': !error,
+        'text-red-600 :': hasError,
+        'text-gray-800 dark:text-white': !hasError,
       }"
     >
       {{ label.value }}
@@ -37,8 +44,10 @@ defineProps<Props>();
       </svg>
     </label>
     <slot />
-    <div v-if="error" class="pt-1 block text-xs text-red-600">
-      {{ error }}
+    <div v-if="hasError" class="pt-1 block text-xs text-red-600">
+      <p v-for="err in error">
+        {{ err }}
+      </p>
     </div>
   </div>
 </template>

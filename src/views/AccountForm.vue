@@ -16,13 +16,39 @@ import {
   onMounted,
   reactive,
   ref,
+  watch,
 } from "vue";
 import { useRouter } from "vue-router";
 import { confirm, message } from "@tauri-apps/api/dialog";
+import { useFormValidation } from "@/composables";
 
 const router = useRouter();
+const {
+  validate,
+  rules,
+  isValidForm,
+  errors: formErrors,
+} = useFormValidation();
+
 const { Account } = api();
 
+// Validate only required fields to test the connection
+// All other fields are ignored
+const canTestConnection = computed(() => {
+  const errorKeys = Object.keys(formErrors.value);
+  if (
+    errorKeys.some((k: string) =>
+      ["server", "username", "port", "mailbox", "password"].includes(k)
+    )
+  ) {
+    return false;
+  }
+  return true;
+});
+
+// Keep state of connection test
+// Test runs async, it should change the state in case of failure
+// or when the test is done
 const testing = ref<boolean>(false);
 
 const isCreatingAccount = computed(
@@ -42,6 +68,7 @@ const title = computed(() => {
   return "Add account";
 });
 
+// "Close" current window and move back to initial page
 const close = () => router.back();
 
 type Form = {
@@ -75,39 +102,26 @@ onMounted(async () => {
   }
 });
 
-const canSubmit = computed(() => {
-  if (
-    form.name.trim() === "" ||
-    form.server.trim() === "" ||
-    String(form.port) === "" ||
-    form.username.trim() === "" ||
-    form.password.trim() === "" ||
-    form.mailbox.trim() === ""
-  ) {
-    return false;
-  }
-  return true;
-});
+const validateForm = (values: Form) => {
+  validate(values, {
+    name: [rules.required("Name is empty")],
+    server: [rules.required("Server is empty")],
+    port: [rules.required("Port is empty")],
+    username: [rules.required("Username is empty")],
+    password: [rules.required("Password is empty")],
+    mailbox: [rules.required("Mailbox is empty")],
+  });
+};
 
-const canTestConnection = computed(() => {
-  if (
-    form.server.trim() === "" ||
-    String(form.port) === "" ||
-    form.username.trim() === "" ||
-    form.password.trim() === "" ||
-    form.mailbox.trim() === ""
-  ) {
-    return false;
-  }
-  return true;
-});
+// Validate the entire for every form change
+watch(form, (values) => validateForm(values));
 
 const saving = ref<boolean>(false);
 const onFormSubmit = async () => {
-  if (!canSubmit.value) {
-    return;
+  validateForm(form);
+  if (!isValidForm.value) {
+    return false;
   }
-
   saving.value = true;
   try {
     await Account.create({
@@ -148,7 +162,8 @@ onBeforeUnmount(async () => {
 });
 
 const onTestConnectionClick = async () => {
-  if (!canTestConnection.value) {
+  validateForm(form);
+  if (!canTestConnection) {
     return;
   }
   testing.value = true;
@@ -215,7 +230,10 @@ const onDeleteClick = async () => {
         <button type="submit" class="hidden" />
         <div class="w-full flex flex-row">
           <div class="w-full">
-            <FormBlock :label="{ value: 'Name', for: 'name' }">
+            <FormBlock
+              :error="formErrors?.name"
+              :label="{ value: 'Name', for: 'name' }"
+            >
               <CustomInput
                 tabindex="0"
                 v-model="form.name"
@@ -237,7 +255,10 @@ const onDeleteClick = async () => {
         </div>
         <div class="w-full flex flex-row">
           <div class="w-[100%] mr-6">
-            <FormBlock :label="{ value: 'Server', for: 'server' }">
+            <FormBlock
+              :error="formErrors?.server"
+              :label="{ value: 'Server', for: 'server' }"
+            >
               <CustomInput
                 v-model="form.server"
                 id="server"
@@ -247,7 +268,10 @@ const onDeleteClick = async () => {
             </FormBlock>
           </div>
           <div class="w-[100px] ml-auto">
-            <FormBlock :label="{ value: 'Port', for: 'port' }">
+            <FormBlock
+              :error="formErrors?.port"
+              :label="{ value: 'Port', for: 'port' }"
+            >
               <CustomInput
                 v-model="form.port"
                 id="port"
@@ -261,7 +285,10 @@ const onDeleteClick = async () => {
         </div>
         <div class="w-full flex flex-row">
           <div class="w-[50%] mr-6">
-            <FormBlock :label="{ value: 'Username', for: 'username' }">
+            <FormBlock
+              :error="formErrors?.username"
+              :label="{ value: 'Username', for: 'username' }"
+            >
               <CustomInput
                 v-model="form.username"
                 id="username"
@@ -271,7 +298,10 @@ const onDeleteClick = async () => {
             </FormBlock>
           </div>
           <div class="w-[50%] ml-auto">
-            <FormBlock :label="{ value: 'Password', for: 'password' }">
+            <FormBlock
+              :error="formErrors?.password"
+              :label="{ value: 'Password', for: 'password' }"
+            >
               <CustomInput
                 v-model="form.password"
                 id="password"
@@ -281,7 +311,10 @@ const onDeleteClick = async () => {
           </div>
         </div>
         <div class="w-full">
-          <FormBlock :label="{ value: 'mailbox', for: 'mailbox' }">
+          <FormBlock
+            :error="formErrors?.mailbox"
+            :label="{ value: 'mailbox', for: 'mailbox' }"
+          >
             <CustomInput v-model="form.mailbox" name="mailbox" id="mailbox" />
           </FormBlock>
         </div>
@@ -289,7 +322,7 @@ const onDeleteClick = async () => {
     </template>
     <template #footer>
       <CustomButton
-        :disabled="!canSubmit"
+        :disabled="!isValidForm"
         :loading="saving"
         @click.prevent="onFormSubmit"
         type="button"
