@@ -71,6 +71,7 @@ async fn main() -> anyhow::Result<()> {
             handlers::account::cmd_list_accounts,
             handlers::account::cmd_find_account,
             handlers::account::cmd_delete_account,
+            handlers::account::cmd_update_account,
             handlers::connection::cmd_test_connection
         ])
         .manage(AppState {

@@ -15,6 +15,16 @@ pub struct CreateAccountAttrs {
     pub mailbox: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UpdateAccountAttrs {
+    pub name: String,
+    pub server: String,
+    pub port: i64,
+    pub color: String,
+    pub username: String,
+    pub mailbox: String,
+}
+
 /// Creates a new account in the database and returns its unique identifier.
 ///
 /// # Arguments
@@ -88,4 +98,25 @@ pub async fn find_account_by_id(id: i64, pool: &Pool<Sqlite>) -> Result<Account>
         .await?;
 
     Ok(result)
+}
+
+pub async fn update_account(id: i64, attrs: UpdateAccountAttrs, pool: &Pool<Sqlite>) -> Result<()> {
+    let query = r#"
+        UPDATE accounts  
+            set name = $1, color = $2, server = $3, port = $4, username = $5, mailbox = $6
+        where id = $7
+    "#;
+
+    sqlx::query(query)
+        .bind(attrs.name)
+        .bind(attrs.color)
+        .bind(attrs.server)
+        .bind(attrs.port)
+        .bind(attrs.username)
+        .bind(attrs.mailbox)
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+    Ok(())
 }

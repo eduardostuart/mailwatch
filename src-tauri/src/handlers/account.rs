@@ -3,8 +3,12 @@ use serde::Deserialize;
 use tauri::{command, State};
 
 use crate::{
-    db::account::{
-        create_account, delete_account, find_account_by_id, list_accounts, CreateAccountAttrs,
+    db::{
+        self,
+        account::{
+            create_account, delete_account, find_account_by_id, list_accounts, update_account,
+            CreateAccountAttrs,
+        },
     },
     error::Error,
     keychain::{Keychain, KeychainEntryKey},
@@ -24,6 +28,17 @@ pub struct NewAccountAttrs {
     pub username: String,
     pub password: String,
     pub mailbox: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateAccountAttrs {
+    pub name: String,
+    pub server: String,
+    pub port: i64,
+    pub color: String,
+    pub username: String,
+    pub mailbox: String,
+    pub password: Option<String>,
 }
 
 /// Command to create new acounts
@@ -82,6 +97,40 @@ pub async fn cmd_delete_account(id: i64, state: State<'_, AppState>) -> Result<(
     }
 
     execute_async_command(delete_account(id, &state.pool)).await?;
+
+    Ok(())
+}
+
+#[command]
+pub async fn cmd_update_account(
+    id: i64,
+    attrs: UpdateAccountAttrs,
+    state: State<'_, AppState>,
+) -> Result<(), Error> {
+    let acc = execute_async_command(find_account_by_id(id, &state.pool)).await?;
+
+    let update_attrs = db::account::UpdateAccountAttrs {
+        name: attrs.name,
+        server: attrs.server,
+        port: attrs.port,
+        color: attrs.color,
+        username: attrs.username,
+        mailbox: attrs.mailbox,
+    };
+
+    execute_async_command(update_account(id, update_attrs, &state.pool)).await?;
+
+    if let Some(pwd) = attrs.password {
+        if !pwd.trim().is_empty() {
+            let keychain_entry = KeychainEntryKey::new(acc.id, &acc.username);
+            let keychain_result = Keychain::new().new_entry(&keychain_entry, &pwd);
+
+            match keychain_result {
+                Ok(_) => info!("password updated"),
+                Err(_) => error!("error while updating password"),
+            }
+        }
+    }
 
     Ok(())
 }

@@ -103,6 +103,7 @@ onMounted(async () => {
     form.color = account?.color || Color.BLUE.toString();
     form.username = account?.username || "";
     form.port = account?.port || 993;
+    form.mailbox = account?.mailbox || "inbox";
   }
 });
 
@@ -135,6 +136,23 @@ const createAccount = async () => {
   });
 };
 
+const updateAccount = async () => {
+  if (!id.value) {
+    return;
+  }
+
+  await Account.update(id.value, {
+    name: form.name,
+    server: form.server,
+    port: parseInt(form.port.toString(), 10),
+    color: form.color,
+    active: true,
+    username: form.username,
+    password: form.password,
+    mailbox: form.mailbox,
+  });
+};
+
 const saving = ref<boolean>(false);
 const onFormSubmit = async () => {
   validateForm(form);
@@ -144,13 +162,14 @@ const onFormSubmit = async () => {
   saving.value = true;
   try {
     if (id.value) {
-      // await updateAccount()
+      await updateAccount();
     } else {
       await createAccount();
     }
     goBack();
   } catch (e) {
-    await message((e as Error).message, {
+    const msg = typeof e === "string" ? e : (e as Error)?.message;
+    await message(msg, {
       title: "Error",
       type: "error",
     });

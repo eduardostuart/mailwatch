@@ -19,6 +19,12 @@ export function api() {
       testConnection(attrs: ConnectionCreds): Promise<string> {
         return invoke<string>("cmd_test_connection", { attrs });
       },
+      update(
+        id: number,
+        attrs: Omit<Account, "id" | "password"> & { password?: string }
+      ): Promise<void> {
+        return invoke<void>("cmd_update_account", { id, attrs });
+      },
       delete(id: number): Promise<void> {
         return invoke<void>("cmd_delete_account", { id });
       },

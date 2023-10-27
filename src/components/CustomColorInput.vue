@@ -31,7 +31,7 @@ const selectColor = (color: string) => {
       @click.prevent="open = !open"
       class="bg-gray-100 dark:bg-gray-900 rounded-md border-gray-300/90 dark:border-gray-600/60 border h-full w-full flex items-center justify-center cursor-pointer"
     >
-      <div class="w-4 h-4 rounded-full" :class="`bg-${inputValue}-600`"></div>
+      <div class="w-4 h-4 rounded-full" :class="`bg-${modelValue}-600`"></div>
     </div>
     <div
       v-if="open"
