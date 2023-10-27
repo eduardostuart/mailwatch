@@ -1,5 +1,5 @@
 import type { Ref, ComputedRef } from "vue";
-import { computed, onMounted, ref } from "vue";
+import { computed, ref } from "vue";
 
 export type RuleName = string;
 export type RuleResponse = [boolean, string];
@@ -14,7 +14,7 @@ export interface FormValidation {
    * Example:
    * { name: { "required": "Field is required" } }
    */
-  errors: Ref<Record<string, FormErrors>>;
+  errors: Ref<Record<string, FormErrors> | undefined>;
 
   /**
    * Current status of the form, if valid or not
@@ -24,7 +24,7 @@ export interface FormValidation {
   /**
    * List of available rules
    */
-  rules: Record<string, (msg?: string) => RuleFunction>;
+  rules: Record<string, (...args: any) => RuleFunction>;
 
   /**
    * Function to run all validations
@@ -48,12 +48,50 @@ function required(msg: string = "Field is required"): RuleFunction {
   ];
 }
 
-export function useFormValidation(): FormValidation {
-  const errors = ref<Record<string, Record<string, string>>>({});
+// Rule to check if a required field is empty or not
+function isNumber(msg: string = "Field is not a number"): RuleFunction {
+  return [
+    "is-number",
+    (input: any): RuleResponse => {
+      if (!input) {
+        return [false, msg];
+      }
+      return [/[0-9]/g.test(input), msg];
+    },
+  ];
+}
 
-  const isValidForm = computed(() => Object.keys(errors.value).length === 0);
+function requiredIf(
+  condition: bool,
+  msg: string = "Field is required"
+): RuleFunction {
+  return [
+    "required-if",
+    (input: any): RuleResponse => {
+      if (condition) {
+        return [input?.toString() !== "", msg];
+      }
+      return [true, msg];
+    },
+  ];
+}
+
+export function useFormValidation(): FormValidation {
+  const errors = ref<Record<string, Record<string, string>> | undefined>(
+    undefined
+  );
+
+  const isValidForm = computed(() => {
+    if (!errors.value) {
+      return false;
+    }
+    return Object.keys(errors.value).length === 0;
+  });
 
   const validateField = (value: any, field: string, rules: RuleFunction[]) => {
+    if (!errors.value) {
+      errors.value = {};
+    }
     for (const [ruleName, ruleFn] of rules) {
       const [isValid, errorMessage] = ruleFn(value);
 
@@ -74,6 +112,8 @@ export function useFormValidation(): FormValidation {
     isValidForm,
     rules: {
       required,
+      isNumber,
+      requiredIf,
     },
     validate(
       request: Record<string, any>,
@@ -81,6 +121,10 @@ export function useFormValidation(): FormValidation {
     ): void {
       Object.keys(validations).forEach((field) => {
         validateField(request[field], field, validations[field]);
+
+        if (!errors.value) {
+          errors.value = {};
+        }
 
         // Clean
         if (Object.keys(errors.value[field] || {}).length === 0) {
