@@ -1,75 +1,19 @@
 <script lang="ts" setup>
-import type { UnlistenFn } from "@tauri-apps/api/event";
 import { api } from "@/api";
 import {
   CustomButton,
   CustomInput,
   FormBlock,
   CustomColorInput,
+  TestConnectionButton,
+  DeleteAccountButton,
 } from "@/components";
 import { Color } from "@/config";
 import { AppLayout } from "@/layouts";
-import {
-  computed,
-  onBeforeMount,
-  onBeforeUnmount,
-  onMounted,
-  reactive,
-  ref,
-  watch,
-} from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { confirm, message } from "@tauri-apps/api/dialog";
+import { message } from "@tauri-apps/api/dialog";
 import { useFormValidation } from "@/composables";
-
-const router = useRouter();
-const {
-  validate,
-  rules,
-  isValidForm,
-  errors: formErrors,
-} = useFormValidation();
-
-const { Account } = api();
-
-// Validate only required fields to test the connection
-// All other fields are ignored
-const canTestConnection = computed(() => {
-  const errorKeys = Object.keys(formErrors.value);
-  if (
-    errorKeys.some((k: string) =>
-      ["server", "username", "port", "mailbox", "password"].includes(k)
-    )
-  ) {
-    return false;
-  }
-  return true;
-});
-
-// Keep state of connection test
-// Test runs async, it should change the state in case of failure
-// or when the test is done
-const testing = ref<boolean>(false);
-
-const isCreatingAccount = computed(
-  () => router.currentRoute.value.name === "add-account"
-);
-
-const id = computed(() => {
-  return (
-    parseInt(router.currentRoute.value.params.id as string, 10) || undefined
-  );
-});
-
-const title = computed(() => {
-  if (!isCreatingAccount.value) {
-    return "Edit account";
-  }
-  return "Add account";
-});
-
-// "Close" current window and move back to initial page
-const close = () => router.back();
 
 type Form = {
   name: string;
@@ -81,12 +25,72 @@ type Form = {
   mailbox: string;
 };
 
+const { Account } = api();
+
+const { currentRoute, back: goBack } = useRouter();
+const {
+  validate,
+  rules,
+  isValidForm,
+  errors: formErrors,
+} = useFormValidation();
+
+// Validate only required fields to test the connection
+// All other fields are ignored
+const canTestConnection = computed(() => {
+  if (!formErrors.value) {
+    return false;
+  }
+  const errorKeys = Object.keys(formErrors.value);
+  if (
+    errorKeys.some((k: string) =>
+      ["server", "username", "port", "mailbox", "password"].includes(k)
+    )
+  ) {
+    return false;
+  }
+  return true;
+});
+
+const isCreatingAccount = computed(
+  () => currentRoute.value.name === "add-account"
+);
+
+const id = computed(() => {
+  return parseInt(currentRoute.value.params.id as string, 10) || undefined;
+});
+
+const title = computed(() => {
+  if (!isCreatingAccount.value) {
+    return "Edit account";
+  }
+  return "Add account";
+});
+
+const onConnectionTestEnd = async (result: string) => {
+  await message(result, { title: "Connection test", type: "info" });
+};
+
+const onConnectionTestFailed = async (err?: string) => {
+  await message(err || "Something went wrong", {
+    title: "Connection test",
+    type: "error",
+  });
+};
+
+const onDeleteError = async (err?: string) => {
+  await message(err || "Something went wrong", {
+    title: "Delete account",
+    type: "error",
+  });
+};
+
 const form = reactive<Form>({
   name: "",
   server: "",
   port: 993,
   username: "",
-  mailbox: "mailbox",
+  mailbox: "inbox",
   password: "",
   color: Color.BLUE.toString(),
 });
@@ -106,15 +110,30 @@ const validateForm = (values: Form) => {
   validate(values, {
     name: [rules.required("Name is empty")],
     server: [rules.required("Server is empty")],
-    port: [rules.required("Port is empty")],
+    port: [rules.required("Port is empty"), rules.isNumber("Invalid port")],
     username: [rules.required("Username is empty")],
-    password: [rules.required("Password is empty")],
+    password: [rules.requiredIf(!id.value, "Password is empty")],
     mailbox: [rules.required("Mailbox is empty")],
   });
 };
 
 // Validate the entire for every form change
-watch(form, (values) => validateForm(values));
+watch(form, (values) => validateForm(values), {
+  immediate: false,
+});
+
+const createAccount = async () => {
+  await Account.create({
+    name: form.name,
+    server: form.server,
+    port: parseInt(form.port.toString(), 10),
+    color: form.color,
+    active: true,
+    username: form.username,
+    password: form.password,
+    mailbox: form.mailbox,
+  });
+};
 
 const saving = ref<boolean>(false);
 const onFormSubmit = async () => {
@@ -124,17 +143,12 @@ const onFormSubmit = async () => {
   }
   saving.value = true;
   try {
-    await Account.create({
-      name: form.name,
-      server: form.server,
-      port: Number(form.port),
-      color: form.color,
-      active: true,
-      username: form.username,
-      password: form.password,
-      mailbox: form.mailbox,
-    });
-    close();
+    if (id.value) {
+      // await updateAccount()
+    } else {
+      await createAccount();
+    }
+    goBack();
   } catch (e) {
     await message((e as Error).message, {
       title: "Error",
@@ -143,82 +157,12 @@ const onFormSubmit = async () => {
   }
   saving.value = false;
 };
-
-let unListenConnectionTestResult: UnlistenFn | undefined;
-onBeforeMount(async () => {
-  unListenConnectionTestResult = await Account.onTestConnectionResponse(
-    async (payload: string) => {
-      testing.value = false;
-      await message(payload, {
-        title: "Test connection",
-        type: "info",
-      });
-    }
-  );
-});
-
-onBeforeUnmount(async () => {
-  unListenConnectionTestResult && unListenConnectionTestResult();
-});
-
-const onTestConnectionClick = async () => {
-  validateForm(form);
-  if (!canTestConnection) {
-    return;
-  }
-  testing.value = true;
-  try {
-    await Account.testConnection({
-      server: form.server,
-      port: form.port,
-      username: form.username,
-      password: form.password,
-      mailbox: form.mailbox,
-    });
-  } catch (err) {
-    console.error(err);
-    testing.value = false;
-    await message((err as Error).message, {
-      title: "Error",
-      type: "error",
-    });
-  }
-};
-
-const deleting = ref<boolean>(false);
-const onDeleteClick = async () => {
-  if (!id.value) {
-    return;
-  }
-
-  const result = await confirm(
-    "Confirm account deletion. This action is irreversible.",
-    {
-      title: "Confirmation",
-      type: "warning",
-      okLabel: "DELETE",
-      cancelLabel: "Cancel",
-    }
-  );
-
-  if (!result) {
-    return;
-  }
-
-  try {
-    await Account.delete(id.value);
-    close();
-  } catch (err) {
-    console.error(err);
-  }
-  deleting.value = false;
-};
 </script>
 <template>
   <AppLayout
-    @keydown.esc="close"
+    @keydown.esc="goBack"
     show-close-button
-    :on-close-button-click="close"
+    :on-close-button-click="goBack"
   >
     <template #title>{{ title }}</template>
     <template #body>
@@ -267,7 +211,7 @@ const onDeleteClick = async () => {
               />
             </FormBlock>
           </div>
-          <div class="w-[100px] ml-auto">
+          <div class="w-[180px] ml-auto">
             <FormBlock
               :error="formErrors?.port"
               :label="{ value: 'Port', for: 'port' }"
@@ -328,23 +272,29 @@ const onDeleteClick = async () => {
         type="button"
         >Save</CustomButton
       >
-      <CustomButton
-        v-if="id"
+      <DeleteAccountButton
+        :on-success="goBack"
+        :on-error="onDeleteError"
         class="ml-2"
-        :loading="deleting"
-        @click.prevent="onDeleteClick"
-        type="button"
-        >Delete</CustomButton
-      >
-      <CustomButton
-        @click.prevent="onTestConnectionClick"
-        class="ml-auto"
-        :loading="testing"
-        :disabled="testing || !canTestConnection"
-        type="button"
-      >
-        test connection</CustomButton
-      >
+        v-if="id"
+        :id="id"
+      />
+
+      <!-- 
+        this can be improved. 
+        for now, we only test connection for new accounts
+      -->
+      <TestConnectionButton
+        v-if="!id"
+        :disabled="!canTestConnection"
+        :on-test-end="onConnectionTestEnd"
+        :on-test-failed="onConnectionTestFailed"
+        :mailbox="form.mailbox"
+        :server="form.server"
+        :username="form.username"
+        :password="form.password"
+        :port="form.port"
+      />
     </template>
   </AppLayout>
 </template>

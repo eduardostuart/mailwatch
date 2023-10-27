@@ -7,3 +7,5 @@ export { default as FormBlock } from "./FormBlock.vue";
 export { default as FormSelect } from "./FormSelect.vue";
 export { default as PreferencePanel } from "./PreferencePanel.vue";
 export { default as PreferenceBlock } from "./PreferenceBlock.vue";
+export { default as TestConnectionButton } from "./TestConnectionButton.vue";
+export { default as DeleteAccountButton } from "./DeleteAccountButton.vue";
