@@ -2,6 +2,7 @@ use keyring::Entry;
 
 pub struct Keychain;
 
+/// Keychain service name
 const SERVICE: &str = "mailwatch";
 
 pub struct KeychainEntryKey<'a> {
@@ -21,15 +22,24 @@ impl std::fmt::Display for KeychainEntryKey<'_> {
     }
 }
 
+impl Default for Keychain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Keychain {
     pub fn new() -> Self {
         Self {}
     }
 
+    /// Get an entry from the keychain
     pub fn get_entry(&self, identification: &KeychainEntryKey) -> anyhow::Result<Entry> {
         Ok(Entry::new(SERVICE, &identification.to_string())?)
     }
 
+    /// Create a new entry in the keychain
+    /// This will also update the password if the entry already exists
     pub fn new_entry(
         &self,
         identification: &KeychainEntryKey,
@@ -40,19 +50,15 @@ impl Keychain {
         Ok(entry)
     }
 
+    /// Get the password for a given entry
     pub fn get_password(&self, identification: KeychainEntryKey) -> anyhow::Result<String> {
         let entry = Entry::new(SERVICE, &identification.to_string())?;
         Ok(entry.get_password()?)
     }
 
+    /// Delete an entry from the keychain
     pub fn delete_entry(&self, entry: Entry) -> anyhow::Result<()> {
         entry.delete_password()?;
         Ok(())
-    }
-}
-
-impl Default for Keychain {
-    fn default() -> Self {
-        Self::new()
     }
 }

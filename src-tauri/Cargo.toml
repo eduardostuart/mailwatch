@@ -13,13 +13,10 @@ edition = "2021"
 tauri-build = { version = "1.5", features = [] }
 
 [dependencies]
-tauri = { version = "1.5", features = ["shell-open", "notification-all", "system-tray", "window-close", "window-hide", "window-maximize", "window-minimize", "window-show", "window-start-dragging", "window-unmaximize", "window-unminimize", "window-set-always-on-top", "dialog-all", "macos-private-api", "icon-ico"] }
+tauri = { version = "1.5", features = ["shell-open", "notification-all", "system-tray", "window-all", "dialog-all", "macos-private-api", "icon-ico"] }
 serde = { version = "1.0", features = ["derive"] } 
 serde_json = "1.0"
-ring = "0.17.5"
 anyhow = "1.0.75"
-base64 = "0.21.4"
-dotenvy = "0.15.7"
 sqlx = { version = "0.7.2", features = ["runtime-tokio-native-tls", "sqlite"] }
 tokio = { version = "1.33.0", features = ["full"] }
 imap = { version = "2.4.1"}
@@ -28,6 +25,8 @@ thiserror = "1.0.50"
 log = "0.4.20"
 simple_logger = "4.2.0"
 keyring = "2.0.5"
+flume = "0.11.0"
+lazy_static = "1.4.0"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

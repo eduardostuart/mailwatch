@@ -1,8 +1,10 @@
+use flume::Sender;
 use log::{error, info};
 use serde::Deserialize;
 use tauri::{command, State};
 
 use crate::{
+    async_cmd,
     db::{
         self,
         account::{
@@ -13,57 +15,56 @@ use crate::{
     error::Error,
     keychain::{Keychain, KeychainEntryKey},
     models::Account,
-    AppState,
+    AppState, Command, UnboundedChannel,
 };
 
-use super::execute_async_command;
-
 #[derive(Debug, Deserialize)]
-pub struct NewAccountAttrs {
-    pub name: String,
-    pub server: String,
+pub struct NewAccountAttrs<'a> {
+    pub name: &'a str,
+    pub server: &'a str,
     pub port: i64,
-    pub color: String,
+    pub color: &'a str,
     pub active: bool,
-    pub username: String,
-    pub password: String,
-    pub mailbox: String,
+    pub username: &'a str,
+    pub password: &'a str,
+    pub mailbox: &'a str,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct UpdateAccountAttrs {
-    pub name: String,
-    pub server: String,
+pub struct UpdateAccountAttrs<'a> {
+    pub name: &'a str,
+    pub server: &'a str,
     pub port: i64,
-    pub color: String,
-    pub username: String,
-    pub mailbox: String,
-    pub password: Option<String>,
+    pub color: &'a str,
+    pub username: &'a str,
+    pub mailbox: &'a str,
+    pub password: Option<&'a str>,
 }
 
 /// Command to create new acounts
 #[command]
 pub async fn cmd_create_account(
-    attrs: NewAccountAttrs,
+    attrs: NewAccountAttrs<'_>,
     state: State<'_, AppState>,
 ) -> Result<i64, Error> {
-    let new_account_attrs = CreateAccountAttrs {
-        name: attrs.name,
-        server: attrs.server,
-        port: attrs.port,
-        color: attrs.color,
-        active: true,
-        username: attrs.username,
-        mailbox: attrs.mailbox,
-    };
-
-    let account = execute_async_command(create_account(new_account_attrs, &state.pool)).await?;
+    let account = async_cmd!(create_account(
+        CreateAccountAttrs {
+            name: attrs.name,
+            server: attrs.server,
+            port: attrs.port,
+            color: attrs.color,
+            active: true,
+            username: attrs.username,
+            mailbox: attrs.mailbox,
+        },
+        &state.pool
+    ))
+    .await?;
 
     let keychain_entry = &KeychainEntryKey::new(account.id, &account.username);
-    match Keychain::new().new_entry(keychain_entry, &attrs.password) {
+    match Keychain::new().new_entry(keychain_entry, attrs.password) {
         Ok(_) => info!("New value added to keychain"),
         Err(e) => {
-            // TODO: use db transaction
             error!("Something went wrong, deleting account entry {}", e);
             delete_account(account.id, &state.pool)
                 .await
@@ -71,24 +72,26 @@ pub async fn cmd_create_account(
         }
     }
 
+    restart_watcher(&state.sender);
+
     Ok(account.id)
 }
 
 /// Command to list all accounts ordered by id desc
 #[command]
 pub async fn cmd_list_accounts(state: State<'_, AppState>) -> Result<Vec<Account>, Error> {
-    execute_async_command(list_accounts(&state.pool)).await
+    async_cmd!(list_accounts(&state.pool)).await
 }
 
 /// Command to find accounts by id
 #[command]
 pub async fn cmd_find_account(id: i64, state: State<'_, AppState>) -> Result<Account, Error> {
-    execute_async_command(find_account_by_id(id, &state.pool)).await
+    async_cmd!(find_account_by_id(id, &state.pool)).await
 }
 
 #[command]
 pub async fn cmd_delete_account(id: i64, state: State<'_, AppState>) -> Result<(), Error> {
-    let acc = execute_async_command(find_account_by_id(id, &state.pool)).await?;
+    let acc = async_cmd!(find_account_by_id(id, &state.pool)).await?;
 
     let key = Keychain::new().get_entry(&KeychainEntryKey::new(acc.id, &acc.username));
 
@@ -96,7 +99,9 @@ pub async fn cmd_delete_account(id: i64, state: State<'_, AppState>) -> Result<(
         info!("Key deleted from keychain");
     }
 
-    execute_async_command(delete_account(id, &state.pool)).await?;
+    async_cmd!(delete_account(id, &state.pool)).await?;
+
+    restart_watcher(&state.sender);
 
     Ok(())
 }
@@ -104,26 +109,29 @@ pub async fn cmd_delete_account(id: i64, state: State<'_, AppState>) -> Result<(
 #[command]
 pub async fn cmd_update_account(
     id: i64,
-    attrs: UpdateAccountAttrs,
+    attrs: UpdateAccountAttrs<'_>,
     state: State<'_, AppState>,
 ) -> Result<(), Error> {
-    let acc = execute_async_command(find_account_by_id(id, &state.pool)).await?;
+    let acc = async_cmd!(find_account_by_id(id, &state.pool)).await?;
 
-    let update_attrs = db::account::UpdateAccountAttrs {
-        name: attrs.name,
-        server: attrs.server,
-        port: attrs.port,
-        color: attrs.color,
-        username: attrs.username,
-        mailbox: attrs.mailbox,
-    };
-
-    execute_async_command(update_account(id, update_attrs, &state.pool)).await?;
+    async_cmd!(update_account(
+        id,
+        db::account::UpdateAccountAttrs {
+            name: attrs.name,
+            server: attrs.server,
+            port: attrs.port,
+            color: attrs.color,
+            username: attrs.username,
+            mailbox: attrs.mailbox,
+        },
+        &state.pool,
+    ))
+    .await?;
 
     if let Some(pwd) = attrs.password {
         if !pwd.trim().is_empty() {
             let keychain_entry = KeychainEntryKey::new(acc.id, &acc.username);
-            let keychain_result = Keychain::new().new_entry(&keychain_entry, &pwd);
+            let keychain_result = Keychain::new().new_entry(&keychain_entry, pwd);
 
             match keychain_result {
                 Ok(_) => info!("password updated"),
@@ -132,5 +140,15 @@ pub async fn cmd_update_account(
         }
     }
 
+    restart_watcher(&state.sender);
+
     Ok(())
+}
+
+/// Send a message to restart the watcher
+fn restart_watcher(sender: &Sender<UnboundedChannel>) {
+    sender
+        .clone()
+        .send((Command::RestartWatcher, None))
+        .expect("Error while sending message");
 }

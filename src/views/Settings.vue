@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { PreferenceBlock, PreferencePanel } from "@/components";
 import { AppLayout } from "@/layouts";
-import { reactive, watch } from "vue";
+import { reactive } from "vue";
 import { useRouter } from "vue-router";
 
 type FormAttrs = {

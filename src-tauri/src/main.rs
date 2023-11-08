@@ -1,50 +1,79 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{sync::mpsc::channel, thread};
-
-use log::info;
+use flume::{unbounded, Sender};
+use log::{error, info, LevelFilter};
+use simple_logger::SimpleLogger;
 use sqlx::{Pool, Sqlite, SqlitePool};
 use tauri::{
-    App, AppHandle, CustomMenuItem, GlobalWindowEvent, Icon, Manager, PhysicalPosition,
-    PhysicalSize, SystemTray, SystemTrayEvent, SystemTrayMenu, Window,
+    api::notification::Notification, App, AppHandle, CustomMenuItem, GlobalWindowEvent, Manager,
+    PhysicalPosition, PhysicalSize, SystemTray, SystemTrayEvent, SystemTrayMenu, Window,
 };
+
+use crate::watcher::Watcher;
 
 pub mod db;
 pub mod error;
 pub mod handlers;
 pub mod imap;
 pub mod keychain;
+pub mod macros;
 pub mod models;
 pub mod watcher;
 
 pub struct AppState {
     pub pool: SqlitePool,
+    pub sender: Sender<UnboundedChannel>,
 }
+
+#[derive(Debug, Clone)]
+pub enum Command {
+    Notify,
+    RestartWatcher,
+}
+
+pub type UnboundedChannel = (Command, Option<models::Account>);
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    simple_logger::init_with_level(log::Level::Info)?;
+    SimpleLogger::new()
+        .with_level(LevelFilter::Info)
+        .init()
+        .expect("Failed to initialize logger");
 
-    info!("Initializing app");
-    let pool = initialize_db().await;
-
-    let (tx, rx) = channel::<(models::Account, String)>();
-    // Initialize watcher
-    watcher::init(&pool, tx)
+    // Initialize database pool
+    let pool = initialize_db()
         .await
-        .expect("Error while initializing watcher");
+        .expect("Failed to initialize the database");
 
-    let rxt = thread::spawn(move || {
-        while let Ok((acc, msg)) = rx.recv() {
-            info!("Received:{}", msg);
+    let (tx, rx) = unbounded::<UnboundedChannel>();
 
-            let title = acc.name.to_string();
-            tauri::api::notification::Notification::new(acc.name)
-                .body("New email received")
-                .title(title)
-                .show()
-                .unwrap();
+    // Create a new Watcher instance
+    let mut watcher = Watcher::new(tx.clone());
+    restart_watcher(&mut watcher, &pool).await;
+
+    let pool_clone: Pool<Sqlite> = pool.clone();
+    let rtx = tokio::spawn(async move {
+        info!("Starting to check for new messages.");
+        while let Ok((cmd, acc)) = rx.recv() {
+            info!("Command received: {:?}", cmd);
+            match cmd {
+                Command::Notify => {
+                    if let Some(account) = acc {
+                        let notification = Notification::new(&account.name)
+                            .body("New email received")
+                            .title(&account.name);
+
+                        if let Err(e) = notification.show() {
+                            error!("Failed to show notification for {}: {}", account.name, e);
+                        }
+                    }
+                }
+                Command::RestartWatcher => {
+                    info!("Attempting to restart the watcher.");
+                    restart_watcher(&mut watcher, &pool_clone).await;
+                }
+            };
         }
     });
 
@@ -57,7 +86,10 @@ async fn main() -> anyhow::Result<()> {
             handlers::account::cmd_update_account,
             handlers::connection::cmd_test_connection
         ])
-        .manage(AppState { pool })
+        .manage(AppState {
+            pool,
+            sender: tx.clone(),
+        })
         .system_tray(build_tray_icon())
         .on_system_tray_event(on_system_tray_event)
         .on_window_event(on_window_event)
@@ -65,12 +97,25 @@ async fn main() -> anyhow::Result<()> {
         .build(tauri::generate_context!())?
         .run(|_, _| {});
 
-    rxt.join().unwrap();
+    if let Err(e) = rtx.await {
+        error!("Watcher task terminated: {:?}", e);
+    }
 
     Ok(())
 }
 
-async fn initialize_db() -> Pool<Sqlite> {
+/// Shutdown and start the watcher again
+///
+/// The purpose of this function is to restart the watcher when the user
+/// adds, deletes or update an existing account
+async fn restart_watcher(watcher: &mut Watcher, pool: &Pool<Sqlite>) {
+    info!("Restarting watcher");
+    let accounts = db::account::list_accounts(pool).await.unwrap();
+    let _ = &watcher.shutdown();
+    let _ = &watcher.start(accounts);
+}
+
+async fn initialize_db() -> anyhow::Result<Pool<Sqlite>> {
     // Directories
     let app_dir = format!(
         "{}/mailwatch",
@@ -86,7 +131,7 @@ async fn initialize_db() -> Pool<Sqlite> {
         .await
         .expect("Error while running migrations");
 
-    pool
+    Ok(pool)
 }
 
 fn build_tray_icon() -> SystemTray {

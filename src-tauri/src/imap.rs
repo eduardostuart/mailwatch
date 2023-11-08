@@ -1,13 +1,15 @@
-use std::{cmp, net::TcpStream, sync::mpsc::Sender};
+use std::{cmp, net::TcpStream};
 
 use anyhow::{anyhow, Result};
+use flume::Sender;
 use imap::Session;
 use log::{error, info};
 use native_tls::{TlsConnector, TlsStream};
 
 use crate::{
     keychain::{Keychain, KeychainEntryKey},
-    models::{self, Account},
+    models::Account,
+    Command, UnboundedChannel,
 };
 
 #[derive(Debug)]
@@ -21,13 +23,13 @@ pub struct Credentials {
 }
 
 #[derive(Debug, Clone)]
-pub struct Imap {
+pub struct Imap<'ac> {
     /// Account information
-    account: Option<Account>,
+    account: Option<&'ac Account>,
 }
 
-impl Imap {
-    pub fn new(account: Option<Account>) -> Self {
+impl<'ac> Imap<'ac> {
+    pub fn new(account: Option<&'ac Account>) -> Self {
         Self { account }
     }
 
@@ -86,11 +88,10 @@ impl Imap {
     /// which will be responsible to update the systray icon and show a desktop notification
     ///
     /// Here we also keep track of the last notified message
-    /// TODO: include channel  to notify about new messages
     pub fn check_for_new_messages(
         &self,
         session: &mut Session<TlsStream<TcpStream>>,
-        tx: &Sender<(models::Account, String)>,
+        tx: &Sender<UnboundedChannel>,
     ) -> Result<()> {
         if self.account.is_none() {
             return Err(anyhow!("Invalid account"));
@@ -99,14 +100,16 @@ impl Imap {
         let mut last_notified = 0;
         let acc = self.account.clone().unwrap();
 
+        info!("Starting watcher for account: {}", acc.username);
+
         loop {
-            if tx.send((acc.clone(), "Message".to_string())).is_err() {
+            if tx.send((Command::Notify, Some(acc.clone()))).is_err() {
+                error!("Err while sending message. stopping watcher");
                 break Ok(());
             }
-
             info!("Checking account: {}", acc.username);
-            let mut new_uids = session.uid_search("NEW 1:*").expect("new ids");
 
+            let mut new_uids = session.uid_search("NEW 1:*").expect("new ids");
             if new_uids.iter().all(|&uid| uid <= last_notified) {
                 new_uids.clear();
             }

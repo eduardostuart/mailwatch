@@ -62,7 +62,7 @@ function isNumber(msg: string = "Field is not a number"): RuleFunction {
 }
 
 function requiredIf(
-  condition: bool,
+  condition: boolean,
   msg: string = "Field is required"
 ): RuleFunction {
   return [
