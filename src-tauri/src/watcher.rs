@@ -15,7 +15,6 @@ pub async fn init(
     pool: &Pool<Sqlite>,
     tx: Sender<(models::Account, String)>,
 ) -> anyhow::Result<()> {
-    debug!("Initializing watcher");
     let accounts = db::account::list_accounts(pool).await?;
     for acc in accounts {
         let tx_clone = tx.clone();

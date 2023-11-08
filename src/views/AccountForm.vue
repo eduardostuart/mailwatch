@@ -26,7 +26,6 @@ type Form = {
 };
 
 const { Account } = api();
-
 const { currentRoute, back: goBack } = useRouter();
 const {
   validate,
@@ -304,7 +303,6 @@ const onFormSubmit = async () => {
         for now, we only test connection for new accounts
       -->
       <TestConnectionButton
-        v-if="!id"
         :disabled="!canTestConnection"
         :on-test-end="onConnectionTestEnd"
         :on-test-failed="onConnectionTestFailed"

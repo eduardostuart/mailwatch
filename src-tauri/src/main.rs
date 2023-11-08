@@ -4,10 +4,10 @@
 use std::{sync::mpsc::channel, thread};
 
 use log::info;
-use sqlx::SqlitePool;
+use sqlx::{Pool, Sqlite, SqlitePool};
 use tauri::{
-    App, AppHandle, CustomMenuItem, GlobalWindowEvent, Manager, PhysicalPosition, PhysicalSize,
-    SystemTray, SystemTrayEvent, SystemTrayMenu, Window,
+    App, AppHandle, CustomMenuItem, GlobalWindowEvent, Icon, Manager, PhysicalPosition,
+    PhysicalSize, SystemTray, SystemTrayEvent, SystemTrayMenu, Window,
 };
 
 pub mod db;
@@ -20,8 +20,6 @@ pub mod watcher;
 
 pub struct AppState {
     pub pool: SqlitePool,
-    pub app_dir: String,
-    pub db_dir: String,
 }
 
 #[tokio::main]
@@ -29,18 +27,7 @@ async fn main() -> anyhow::Result<()> {
     simple_logger::init_with_level(log::Level::Info)?;
 
     info!("Initializing app");
-
-    // Directories
-    let app_dir = format!(
-        "{}/mailwatch",
-        tauri::api::path::home_dir().unwrap().display()
-    );
-    let db_dir = format!("{}/.db", app_dir);
-
-    // Initialize db
-    let db_path = db::initialize_db(std::path::Path::new(&db_dir));
-    let pool = db::connect(&db_path).await;
-    db::run_migrations(&pool).await?;
+    let pool = initialize_db().await;
 
     let (tx, rx) = channel::<(models::Account, String)>();
     // Initialize watcher
@@ -51,10 +38,6 @@ async fn main() -> anyhow::Result<()> {
     let rxt = thread::spawn(move || {
         while let Ok((acc, msg)) = rx.recv() {
             info!("Received:{}", msg);
-
-            // TODO: this needs to be improved
-            // show total messages?
-            // preview of message(s)? (check settings)
 
             let title = acc.name.to_string();
             tauri::api::notification::Notification::new(acc.name)
@@ -74,11 +57,7 @@ async fn main() -> anyhow::Result<()> {
             handlers::account::cmd_update_account,
             handlers::connection::cmd_test_connection
         ])
-        .manage(AppState {
-            pool,
-            app_dir,
-            db_dir,
-        })
+        .manage(AppState { pool })
         .system_tray(build_tray_icon())
         .on_system_tray_event(on_system_tray_event)
         .on_window_event(on_window_event)
@@ -89,6 +68,25 @@ async fn main() -> anyhow::Result<()> {
     rxt.join().unwrap();
 
     Ok(())
+}
+
+async fn initialize_db() -> Pool<Sqlite> {
+    // Directories
+    let app_dir = format!(
+        "{}/mailwatch",
+        tauri::api::path::home_dir().unwrap().display()
+    );
+    let db_dir = format!("{}/.db", app_dir);
+
+    let db_path = db::initialize_db(std::path::Path::new(&db_dir));
+
+    let pool = db::connect(&db_path).await;
+
+    db::run_migrations(&pool)
+        .await
+        .expect("Error while running migrations");
+
+    pool
 }
 
 fn build_tray_icon() -> SystemTray {
