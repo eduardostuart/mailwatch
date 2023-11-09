@@ -17,22 +17,22 @@ const CONNECTION_TEST_EVENT: &str = "connection_test_result";
 pub struct NewAccountAttrs<'a> {
     pub name: &'a str,
     pub server: &'a str,
-    pub port: i64,
     pub color: &'a str,
     pub active: bool,
     pub username: &'a str,
     pub password: &'a str,
     pub mailbox: &'a str,
+    pub port: i64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateAccountAttrs<'a> {
     pub name: &'a str,
     pub server: &'a str,
-    pub port: i64,
     pub color: &'a str,
     pub username: &'a str,
     pub mailbox: &'a str,
+    pub port: i64,
     pub password: Option<&'a str>,
 }
 
