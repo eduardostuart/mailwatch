@@ -1,22 +1,17 @@
+use std::thread;
+
+use crate::db::account;
+use crate::imap::{ConnectionDetails, Imap};
+use crate::{
+    async_cmd, db::account::CreateAccountAttrs, error::Error, keychain::Keychain, models::Account,
+    AppState, ChannelCmd, UnboundedChannel,
+};
 use flume::Sender;
 use log::{error, info};
 use serde::Deserialize;
-use tauri::{command, State};
+use tauri::{command, State, Window};
 
-use crate::{
-    async_cmd,
-    db::{
-        self,
-        account::{
-            create_account, delete_account, find_account_by_id, list_accounts, update_account,
-            CreateAccountAttrs,
-        },
-    },
-    error::Error,
-    keychain::{Keychain, KeychainEntryKey},
-    models::Account,
-    AppState, Command, UnboundedChannel,
-};
+const CONNECTION_TEST_EVENT: &str = "connection_test_result";
 
 #[derive(Debug, Deserialize)]
 pub struct NewAccountAttrs<'a> {
@@ -41,13 +36,27 @@ pub struct UpdateAccountAttrs<'a> {
     pub password: Option<&'a str>,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct TestConnectionAttrs<'a> {
+    /// Imap server
+    pub server: &'a str,
+    /// Imap port
+    pub port: i64,
+    /// Imap username
+    pub username: &'a str,
+    /// Imap password
+    pub password: &'a str,
+    /// Mailbox name
+    pub mailbox: &'a str,
+}
+
 /// Command to create new acounts
 #[command]
 pub async fn cmd_create_account(
     attrs: NewAccountAttrs<'_>,
     state: State<'_, AppState>,
 ) -> Result<i64, Error> {
-    let account = async_cmd!(create_account(
+    let account = async_cmd!(account::create(
         CreateAccountAttrs {
             name: attrs.name,
             server: attrs.server,
@@ -61,18 +70,17 @@ pub async fn cmd_create_account(
     ))
     .await?;
 
-    let keychain_entry = &KeychainEntryKey::new(account.id, &account.username);
-    match Keychain::new().new_entry(keychain_entry, attrs.password) {
+    match Keychain::new(account.id, &account.username).new_entry(attrs.password) {
         Ok(_) => info!("New value added to keychain"),
         Err(e) => {
             error!("Something went wrong, deleting account entry {}", e);
-            delete_account(account.id, &state.pool)
+            account::delete(account.id, &state.pool)
                 .await
                 .expect("error while deleting");
         }
     }
 
-    restart_watcher(&state.sender);
+    send_restart_watcher_cmd(&state.sender);
 
     Ok(account.id)
 }
@@ -80,28 +88,27 @@ pub async fn cmd_create_account(
 /// Command to list all accounts ordered by id desc
 #[command]
 pub async fn cmd_list_accounts(state: State<'_, AppState>) -> Result<Vec<Account>, Error> {
-    async_cmd!(list_accounts(&state.pool)).await
+    async_cmd!(account::all(&state.pool)).await
 }
 
 /// Command to find accounts by id
 #[command]
 pub async fn cmd_find_account(id: i64, state: State<'_, AppState>) -> Result<Account, Error> {
-    async_cmd!(find_account_by_id(id, &state.pool)).await
+    async_cmd!(account::find(id, &state.pool)).await
 }
 
 #[command]
 pub async fn cmd_delete_account(id: i64, state: State<'_, AppState>) -> Result<(), Error> {
-    let acc = async_cmd!(find_account_by_id(id, &state.pool)).await?;
+    let acc = async_cmd!(account::find(id, &state.pool)).await?;
 
-    let key = Keychain::new().get_entry(&KeychainEntryKey::new(acc.id, &acc.username));
-
+    let key = Keychain::new(acc.id, &acc.username).get_entry();
     if key.is_ok() && key.unwrap().delete_password().is_ok() {
         info!("Key deleted from keychain");
     }
 
-    async_cmd!(delete_account(id, &state.pool)).await?;
+    async_cmd!(account::delete(id, &state.pool)).await?;
 
-    restart_watcher(&state.sender);
+    send_restart_watcher_cmd(&state.sender);
 
     Ok(())
 }
@@ -112,11 +119,11 @@ pub async fn cmd_update_account(
     attrs: UpdateAccountAttrs<'_>,
     state: State<'_, AppState>,
 ) -> Result<(), Error> {
-    let acc = async_cmd!(find_account_by_id(id, &state.pool)).await?;
+    let acc = async_cmd!(account::find(id, &state.pool)).await?;
 
-    async_cmd!(update_account(
+    async_cmd!(account::update(
         id,
-        db::account::UpdateAccountAttrs {
+        account::UpdateAccountAttrs {
             name: attrs.name,
             server: attrs.server,
             port: attrs.port,
@@ -128,27 +135,54 @@ pub async fn cmd_update_account(
     ))
     .await?;
 
+    // Update keychain value if the user has provided a new password
     if let Some(pwd) = attrs.password {
         if !pwd.trim().is_empty() {
-            let keychain_entry = KeychainEntryKey::new(acc.id, &acc.username);
-            let keychain_result = Keychain::new().new_entry(&keychain_entry, pwd);
-
-            match keychain_result {
+            match Keychain::new(acc.id, &acc.username).new_entry(pwd) {
                 Ok(_) => info!("password updated"),
                 Err(_) => error!("error while updating password"),
             }
         }
     }
 
-    restart_watcher(&state.sender);
+    send_restart_watcher_cmd(&state.sender);
 
     Ok(())
 }
 
+/// A command to verify IMAP connection.
+///
+/// This test attempts a connection,
+/// returning "OK" if the connection is successful, or the server error message on failure.
+/// This command runs asynchronously and will emit an event when the connection test ends.
+#[command]
+pub fn cmd_test_connection(attrs: TestConnectionAttrs<'_>, window: Window) {
+    let conn_details = &ConnectionDetails {
+        server: (attrs.server, attrs.port),
+        username: attrs.username,
+        password: attrs.password,
+        mailbox: attrs.mailbox,
+    };
+
+    thread::scope(|s| {
+        s.spawn(|| {
+            window
+                .emit(
+                    CONNECTION_TEST_EVENT,
+                    match Imap::test_connection(conn_details) {
+                        Ok(msg) => msg,
+                        Err(e) => e.to_string(),
+                    },
+                )
+                .unwrap();
+        });
+    });
+}
+
 /// Send a message to restart the watcher
-fn restart_watcher(sender: &Sender<UnboundedChannel>) {
+fn send_restart_watcher_cmd(sender: &Sender<UnboundedChannel>) {
     sender
         .clone()
-        .send((Command::RestartWatcher, None))
+        .send((ChannelCmd::RestartWatcher, None))
         .expect("Error while sending message");
 }

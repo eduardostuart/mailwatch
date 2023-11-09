@@ -15,12 +15,22 @@ pub struct CreateAccountAttrs<'a> {
     pub mailbox: &'a str,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UpdateAccountAttrs<'a> {
+    pub name: &'a str,
+    pub server: &'a str,
+    pub port: i64,
+    pub color: &'a str,
+    pub username: &'a str,
+    pub mailbox: &'a str,
+}
+
 /// Creates a new account in the database and returns its unique identifier.
 ///
 /// # Arguments
 /// * `attrs` - `CreateAccountAttrs` account creation attributes
 /// * `pool` - A reference to the SQLite connection pool.
-pub async fn create_account(attrs: CreateAccountAttrs<'_>, pool: &Pool<Sqlite>) -> Result<Account> {
+pub async fn create(attrs: CreateAccountAttrs<'_>, pool: &Pool<Sqlite>) -> Result<Account> {
     let query = r#"
         INSERT INTO accounts 
             (name, server, port, color, active, username, mailbox) 
@@ -40,16 +50,14 @@ pub async fn create_account(attrs: CreateAccountAttrs<'_>, pool: &Pool<Sqlite>) 
         .await?
         .last_insert_rowid();
 
-    let account = find_account_by_id(id, pool).await?;
-
-    Ok(account)
+    find(id, pool).await
 }
 
 /// Delete an account
 ///
 /// # Arguments
 /// * `id` - account id to be deleted
-pub async fn delete_account(id: i64, pool: &Pool<Sqlite>) -> Result<()> {
+pub async fn delete(id: i64, pool: &Pool<Sqlite>) -> Result<()> {
     sqlx::query(r#"DELETE from accounts where id = $1"#)
         .bind(id)
         .execute(pool)
@@ -61,7 +69,7 @@ pub async fn delete_account(id: i64, pool: &Pool<Sqlite>) -> Result<()> {
 ///
 /// # Arguments
 /// * `pool` - A reference to the SQLite connection pool.
-pub async fn list_accounts(pool: &Pool<Sqlite>) -> Result<Vec<Account>> {
+pub async fn all(pool: &Pool<Sqlite>) -> Result<Vec<Account>> {
     let result = sqlx::query_as::<_, Account>(
         r#"
         SELECT id, name, color, server, port, active, username, mailbox
@@ -79,7 +87,7 @@ pub async fn list_accounts(pool: &Pool<Sqlite>) -> Result<Vec<Account>> {
 /// # Arguments
 /// * `id` - The account id to be retrieved
 /// * `pool` - A reference to the SQLite connection pool.
-pub async fn find_account_by_id(id: i64, pool: &Pool<Sqlite>) -> Result<Account> {
+pub async fn find(id: i64, pool: &Pool<Sqlite>) -> Result<Account> {
     let result = query_as::<_, Account>(
         r#"
         SELECT id, name, color, server, port, active, username, mailbox
@@ -94,21 +102,7 @@ pub async fn find_account_by_id(id: i64, pool: &Pool<Sqlite>) -> Result<Account>
     Ok(result)
 }
 
-#[derive(Debug, Deserialize)]
-pub struct UpdateAccountAttrs<'a> {
-    pub name: &'a str,
-    pub server: &'a str,
-    pub port: i64,
-    pub color: &'a str,
-    pub username: &'a str,
-    pub mailbox: &'a str,
-}
-
-pub async fn update_account(
-    id: i64,
-    attrs: UpdateAccountAttrs<'_>,
-    pool: &Pool<Sqlite>,
-) -> Result<()> {
+pub async fn update(id: i64, attrs: UpdateAccountAttrs<'_>, pool: &Pool<Sqlite>) -> Result<()> {
     sqlx::query(
         r#"
         UPDATE accounts  

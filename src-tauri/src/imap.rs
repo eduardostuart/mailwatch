@@ -6,20 +6,18 @@ use imap::Session;
 use log::{error, info};
 use native_tls::{TlsConnector, TlsStream};
 
-use crate::{
-    keychain::{Keychain, KeychainEntryKey},
-    models::Account,
-    Command, UnboundedChannel,
-};
+use crate::{keychain::Keychain, models::Account, ChannelCmd, UnboundedChannel};
 
-#[derive(Debug)]
-pub struct Credentials {
+#[derive(Debug, Clone)]
+pub struct ConnectionDetails<'a> {
     /// Server host and port
-    pub server: (String, i64),
+    pub server: (&'a str, i64),
     /// Server username
-    pub username: String,
+    pub username: &'a str,
     /// Server password
-    pub password: String,
+    pub password: &'a str,
+    /// Mailbox name
+    pub mailbox: &'a str,
 }
 
 #[derive(Debug, Clone)]
@@ -40,33 +38,28 @@ impl<'ac> Imap<'ac> {
             return Err(anyhow!("Invalid account"));
         }
 
-        let acc = self.account.clone().unwrap();
+        let acc = self.account.unwrap();
 
-        let password = Keychain::new()
-            .get_password(KeychainEntryKey::new(acc.id, &acc.username))
+        let password = Keychain::new(acc.id, &acc.username)
+            .get_password()
             .expect("Password not found");
 
-        self.connect(
-            &acc.server,
-            acc.port,
-            &acc.username,
-            &password,
-            &acc.mailbox,
-        )
+        self.connect(&ConnectionDetails {
+            server: (&acc.server, acc.port),
+            username: &acc.username,
+            password: &password,
+            mailbox: &acc.mailbox,
+        })
     }
 
-    pub fn connect(
-        &mut self,
-        server: &str,
-        port: i64,
-        username: &str,
-        password: &str,
-        mailbox: &str,
-    ) -> Result<Session<TlsStream<TcpStream>>> {
+    pub fn connect(&mut self, conn: &ConnectionDetails) -> Result<Session<TlsStream<TcpStream>>> {
         let ssl_connector = TlsConnector::builder().build()?;
-        let addr = format!("{}:{}", server, port);
-        let client = imap::connect(addr, server, &ssl_connector)?;
-        match client.login(username, password) {
+        let client = imap::connect(
+            format!("{}:{}", conn.server.0, conn.server.1),
+            conn.server.0,
+            &ssl_connector,
+        )?;
+        match client.login(conn.username, conn.password) {
             Ok(mut session) => {
                 // Check if the server has IDLE capability
                 // IDLE capability can be used to receive notifications of new messages without polling.
@@ -76,7 +69,7 @@ impl<'ac> Imap<'ac> {
                     let _ = session.logout();
                     return Err(anyhow!("server does not support IDLE "));
                 }
-                let _ = session.select(mailbox);
+                let _ = session.select(conn.mailbox);
                 Ok(session)
             }
             Err((e, _)) => Err(anyhow!(e.to_string())),
@@ -84,9 +77,8 @@ impl<'ac> Imap<'ac> {
     }
 
     /// Initialize idle checker
-    /// For every new message we notify our main thread
+    /// For every new message we send a message to the channel
     /// which will be responsible to update the systray icon and show a desktop notification
-    ///
     /// Here we also keep track of the last notified message
     pub fn check_for_new_messages(
         &self,
@@ -98,12 +90,12 @@ impl<'ac> Imap<'ac> {
         }
 
         let mut last_notified = 0;
-        let acc = self.account.clone().unwrap();
+        let acc = self.account.unwrap();
 
         info!("Starting watcher for account: {}", acc.username);
 
         loop {
-            if tx.send((Command::Notify, Some(acc.clone()))).is_err() {
+            if tx.send((ChannelCmd::Notify, Some(acc.clone()))).is_err() {
                 error!("Err while sending message. stopping watcher");
                 break Ok(());
             }
@@ -121,22 +113,16 @@ impl<'ac> Imap<'ac> {
 
     /// Simple connection test
     /// Validate if imap connection are correct (server, credentials and mailbox)
-    pub fn test_connection(
-        &mut self,
-        server: &str,
-        port: i64,
-        username: &str,
-        password: &str,
-        mailbox: &str,
-    ) -> Result<String> {
+    pub fn test_connection(conn_details: &ConnectionDetails) -> Result<String> {
         info!("Testing connection");
-        match self.connect(server, port, username, password, mailbox) {
+        match Imap::new(None).connect(conn_details) {
             Ok(mut session) => {
+                info!("test_connection - Connection successful");
                 session.logout()?;
                 Ok("OK".to_string())
             }
             Err(e) => {
-                error!("Error from test connection: {:?}", e);
+                error!("test_connection - Error: {:?}", e);
                 Err(anyhow!("Error: {:?}", e))
             }
         }

@@ -1,25 +1,33 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use db::{initialize_db, run_migrations};
 use flume::{unbounded, Sender};
-use log::{error, info, LevelFilter};
+use lazy_static::lazy_static;
+use log::{debug, error, info, LevelFilter};
 use simple_logger::SimpleLogger;
 use sqlx::{Pool, Sqlite, SqlitePool};
 use tauri::{
-    api::notification::Notification, App, AppHandle, CustomMenuItem, GlobalWindowEvent, Manager,
-    PhysicalPosition, PhysicalSize, SystemTray, SystemTrayEvent, SystemTrayMenu, Window,
+    api::{notification::Notification, path::home_dir},
+    App, AppHandle, CustomMenuItem, GlobalWindowEvent, Manager, PhysicalPosition, PhysicalSize,
+    SystemTray, SystemTrayEvent, SystemTrayMenu, Window,
 };
 
-use crate::watcher::Watcher;
+use crate::{db::account, watcher::Watcher};
 
+pub mod commands;
 pub mod db;
 pub mod error;
-pub mod handlers;
 pub mod imap;
 pub mod keychain;
 pub mod macros;
 pub mod models;
 pub mod watcher;
+
+lazy_static! {
+    static ref APP_DIR: String = format!("{}/mailwatch", home_dir().unwrap().display());
+    static ref DB_DIR: String = format!("{}/.db", APP_DIR.as_str());
+}
 
 pub struct AppState {
     pub pool: SqlitePool,
@@ -27,12 +35,12 @@ pub struct AppState {
 }
 
 #[derive(Debug, Clone)]
-pub enum Command {
+pub enum ChannelCmd {
     Notify,
     RestartWatcher,
 }
 
-pub type UnboundedChannel = (Command, Option<models::Account>);
+pub type UnboundedChannel = (ChannelCmd, Option<models::Account>);
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -41,24 +49,25 @@ async fn main() -> anyhow::Result<()> {
         .init()
         .expect("Failed to initialize logger");
 
-    // Initialize database pool
-    let pool = initialize_db()
+    // Initialize database
+    let db_path = initialize_db(std::path::Path::new(&DB_DIR.as_str()));
+    let pool = db::connect(&db_path).await;
+    run_migrations(&pool)
         .await
-        .expect("Failed to initialize the database");
+        .expect("Error while running migrations");
 
     let (tx, rx) = unbounded::<UnboundedChannel>();
 
-    // Create a new Watcher instance
     let mut watcher = Watcher::new(tx.clone());
-    restart_watcher(&mut watcher, &pool).await;
+    start_watcher(&mut watcher, &pool).await;
 
     let pool_clone: Pool<Sqlite> = pool.clone();
     let rtx = tokio::spawn(async move {
-        info!("Starting to check for new messages.");
+        debug!("Starting to check for new messages.");
         while let Ok((cmd, acc)) = rx.recv() {
             info!("Command received: {:?}", cmd);
             match cmd {
-                Command::Notify => {
+                ChannelCmd::Notify => {
                     if let Some(account) = acc {
                         let notification = Notification::new(&account.name)
                             .body("New email received")
@@ -69,8 +78,7 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
                 }
-                Command::RestartWatcher => {
-                    info!("Attempting to restart the watcher.");
+                ChannelCmd::RestartWatcher => {
                     restart_watcher(&mut watcher, &pool_clone).await;
                 }
             };
@@ -79,12 +87,12 @@ async fn main() -> anyhow::Result<()> {
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
-            handlers::account::cmd_create_account,
-            handlers::account::cmd_list_accounts,
-            handlers::account::cmd_find_account,
-            handlers::account::cmd_delete_account,
-            handlers::account::cmd_update_account,
-            handlers::connection::cmd_test_connection
+            commands::cmd_create_account,
+            commands::cmd_list_accounts,
+            commands::cmd_find_account,
+            commands::cmd_delete_account,
+            commands::cmd_update_account,
+            commands::cmd_test_connection
         ])
         .manage(AppState {
             pool,
@@ -109,29 +117,14 @@ async fn main() -> anyhow::Result<()> {
 /// The purpose of this function is to restart the watcher when the user
 /// adds, deletes or update an existing account
 async fn restart_watcher(watcher: &mut Watcher, pool: &Pool<Sqlite>) {
-    info!("Restarting watcher");
-    let accounts = db::account::list_accounts(pool).await.unwrap();
     let _ = &watcher.shutdown();
-    let _ = &watcher.start(accounts);
+    start_watcher(watcher, pool).await;
 }
 
-async fn initialize_db() -> anyhow::Result<Pool<Sqlite>> {
-    // Directories
-    let app_dir = format!(
-        "{}/mailwatch",
-        tauri::api::path::home_dir().unwrap().display()
-    );
-    let db_dir = format!("{}/.db", app_dir);
-
-    let db_path = db::initialize_db(std::path::Path::new(&db_dir));
-
-    let pool = db::connect(&db_path).await;
-
-    db::run_migrations(&pool)
-        .await
-        .expect("Error while running migrations");
-
-    Ok(pool)
+async fn start_watcher(watcher: &mut Watcher, pool: &Pool<Sqlite>) {
+    info!("Starting watcher");
+    let accounts = account::all(pool).await.unwrap();
+    let _ = &watcher.start(accounts);
 }
 
 fn build_tray_icon() -> SystemTray {

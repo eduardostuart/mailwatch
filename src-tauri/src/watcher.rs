@@ -1,5 +1,5 @@
 use flume::Sender;
-use log::{error, info};
+use log::{error, info, warn};
 use tokio::task::JoinHandle;
 
 use crate::{imap::Imap, models::Account, UnboundedChannel};
@@ -51,7 +51,7 @@ impl Watcher {
     }
 
     pub fn shutdown(&mut self) {
-        info!("shutting down watcher");
+        warn!("shutting down watcher");
         for thread in self.threads.drain(..) {
             thread.abort();
         }
