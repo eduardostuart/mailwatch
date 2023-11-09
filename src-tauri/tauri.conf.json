@@ -35,8 +35,8 @@
         "depends": []
       },
       "targets": "all",
-      "identifier": "io.mailwatch",
-      "longDescription": "",
+      "identifier": "dev.mailwatch",
+      "longDescription": "A system tray application that provides real-time notifications for unseen emails across multiple email accounts.",
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",
@@ -45,7 +45,7 @@
         "icons/icon.ico"
       ],
       "resources": [],
-      "shortDescription": "",
+      "shortDescription": "A system tray application that provides real-time notifications for unseen emails",
       "windows": {
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",

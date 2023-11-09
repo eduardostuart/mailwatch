@@ -1,10 +1,10 @@
 [package]
 name = "mailwatch"
-version = "0.0.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
+version = "0.1.0"
+description = "A system tray application that provides real-time notifications for unseen emails across multiple email accounts."
+authors = ["Eduardo Stuart <e@s.tuart.me>"]
+license = "MIT"
+repository = "https://github.com/eduardostuart/mailwatch"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
