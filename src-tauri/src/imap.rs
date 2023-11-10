@@ -1,12 +1,16 @@
-use std::{cmp, net::TcpStream};
+use std::{cmp, collections::HashMap, net::TcpStream, sync::Mutex};
 
+use crate::{keychain::Keychain, models::Account, ChannelCmd, UnboundedChannel};
 use anyhow::{anyhow, Result};
 use flume::Sender;
 use imap::Session;
+use lazy_static::lazy_static;
 use log::{error, info};
 use native_tls::{TlsConnector, TlsStream};
 
-use crate::{keychain::Keychain, models::Account, ChannelCmd, UnboundedChannel};
+lazy_static! {
+    static ref LAST_NOTIFIED: Mutex<HashMap<i64, u32>> = Mutex::new(HashMap::new());
+}
 
 #[derive(Debug, Clone)]
 pub struct ConnectionDetails<'a> {
@@ -89,24 +93,33 @@ impl<'ac> Imap<'ac> {
             return Err(anyhow!("Invalid account"));
         }
 
-        let mut last_notified = 0;
         let acc = self.account.unwrap();
 
         info!("Starting watcher for account: {}", acc.username);
 
         loop {
+            let mut last_notified_history = LAST_NOTIFIED.lock().unwrap();
+
+            info!("Messages checked for account: {:?}", &last_notified_history);
             if tx.send((ChannelCmd::Notify, Some(acc.clone()))).is_err() {
                 error!("Err while sending message. stopping watcher");
                 break Ok(());
             }
+
             info!("Checking account: {}", acc.username);
 
             let mut new_uids = session.uid_search("NEW 1:*").expect("new ids");
+            let mut last_notified = match last_notified_history.get(&acc.id) {
+                Some(v) => *v,
+                None => 0,
+            };
+
             if new_uids.iter().all(|&uid| uid <= last_notified) {
                 new_uids.clear();
             }
 
             last_notified = cmp::max(last_notified, new_uids.iter().cloned().max().unwrap_or(0));
+            last_notified_history.insert(acc.id, last_notified);
             session.idle()?.wait_keepalive()?;
         }
     }
