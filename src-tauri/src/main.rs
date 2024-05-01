@@ -87,14 +87,14 @@ async fn main() -> anyhow::Result<()> {
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
-            commands::cmd_create_account,
-            commands::cmd_list_accounts,
-            commands::cmd_find_account,
-            commands::cmd_delete_account,
-            commands::cmd_update_account,
-            commands::cmd_test_connection,
-            commands::cmd_update_settings,
-            commands::cmd_fetch_settings
+            commands::account::cmd_create_account,
+            commands::account::cmd_list_accounts,
+            commands::account::cmd_find_account,
+            commands::account::cmd_delete_account,
+            commands::account::cmd_update_account,
+            commands::connection::cmd_test_connection,
+            commands::settings::cmd_update_settings,
+            commands::settings::cmd_fetch_settings
         ])
         .manage(AppState {
             pool,

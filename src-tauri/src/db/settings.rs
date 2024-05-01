@@ -28,9 +28,9 @@ pub async fn fetch(pool: &Pool<Sqlite>) -> Result<Option<Settings>> {
 pub async fn update(attrs: UpdateSettingsAttrs, pool: &Pool<Sqlite>) -> Result<()> {
     debug!("Update settings: {:?}", attrs);
     sqlx::query(r#"UPDATE settings set notifications = $1, preview = $2, sound = $3"#)
-        .bind(attrs.notifications.unwrap_or_else(|| false))
-        .bind(attrs.preview.unwrap_or_else(|| false))
-        .bind(attrs.sound.unwrap_or_else(|| false))
+        .bind(attrs.notifications.unwrap_or(false))
+        .bind(attrs.preview.unwrap_or(false))
+        .bind(attrs.sound.unwrap_or(false))
         .execute(pool)
         .await?;
     Ok(())
